@@ -1,0 +1,131 @@
+/* Tema escuro inspirado no Modrinth App */
+:root {
+  --color-bg: #16181c;
+  --color-raised-bg: #26292f;
+  --color-super-raised-bg: #33363d;
+  --color-button-bg: #33363d;
+  --color-button-bg-hover: #434956;
+  --color-divider: #33363d;
+
+  --color-base: #b0bac5;
+  --color-secondary: #96a2b0;
+  --color-contrast: #ecf9fb;
+
+  --color-brand: #1bd96a;
+  --color-brand-highlight: rgba(27, 217, 106, 0.25);
+  --color-accent-contrast: #062312;
+
+  --color-red: #ff496e;
+  --color-orange: #ffa347;
+  --color-blue: #4f9cff;
+  --color-purple: #c78aff;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --font-standard: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: var(--font-standard);
+  background: var(--color-bg);
+  color: var(--color-base);
+  font-size: 14px;
+  overflow: hidden;
+  user-select: none;
+}
+
+h1, h2, h3, h4 {
+  color: var(--color-contrast);
+  margin: 0;
+}
+
+a {
+  color: var(--color-brand);
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  background: var(--color-button-bg);
+  color: var(--color-contrast);
+  padding: 0.5rem 1rem;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s ease, filter 0.15s ease;
+}
+
+button:hover {
+  background: var(--color-button-bg-hover);
+}
+
+button.btn-brand {
+  background: var(--color-brand);
+  color: var(--color-accent-contrast);
+  font-weight: 700;
+}
+
+button.btn-brand:hover {
+  filter: brightness(1.15);
+  background: var(--color-brand);
+}
+
+input, select {
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--color-button-bg);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-contrast);
+  padding: 0.5rem 0.85rem;
+  outline: none;
+}
+
+input::placeholder {
+  color: var(--color-secondary);
+}
+
+input:focus {
+  box-shadow: 0 0 0 2px var(--color-brand-highlight);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-button-bg);
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-button-bg-hover);
+}
+
+.card {
+  background: var(--color-raised-bg);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+}
