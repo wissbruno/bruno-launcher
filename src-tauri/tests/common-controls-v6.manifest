@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Manifest externo para executáveis de teste: o Tauri importa
+     TaskDialogIndirect, que só existe no comctl32 v6. O app principal ganha
+     isso embutido pelo tauri-build; os testes precisam deste arquivo copiado
+     como "<exe>.manifest" (feito automaticamente pelo script de teste). -->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>

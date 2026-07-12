@@ -3,6 +3,7 @@ import HomePage from './pages/HomePage.vue';
 import BrowsePage from './pages/BrowsePage.vue';
 import ProjectPage from './pages/ProjectPage.vue';
 import LibraryPage from './pages/LibraryPage.vue';
+import InstancePage from './pages/InstancePage.vue';
 import SettingsPage from './pages/SettingsPage.vue';
 
 export const router = createRouter({
@@ -12,6 +13,7 @@ export const router = createRouter({
     { path: '/browse/:type', name: 'browse', component: BrowsePage },
     { path: '/project/:id', name: 'project', component: ProjectPage },
     { path: '/library', name: 'library', component: LibraryPage },
+    { path: '/instance/:id', name: 'instance', component: InstancePage },
     { path: '/settings', name: 'settings', component: SettingsPage },
   ],
 });

@@ -17,34 +17,38 @@ stack do original — **Tauri 2 + Rust** (backend) e **Vue 3 + TypeScript + Pini
 - [x] Busca com filtros: categoria, mod loader, versão do jogo, ordenação, paginação
 - [x] Página de projeto: descrição (markdown), versões, galeria, download
 
-### 🔲 3. Instâncias (backend Rust)
-- [ ] Modelo de instância (pasta, versão do MC, mod loader) salvo em disco
-- [ ] Comandos Tauri: criar/renomear/apagar/listar instâncias
-- [ ] Tela de biblioteca conectada ao backend
+### ✅ 3. Instâncias (backend Rust)
+- [x] Modelo de instância (pasta, versão do MC, mod loader) salvo em disco
+- [x] Comandos Tauri: criar/renomear/apagar/listar instâncias + conteúdo
+- [x] Tela de biblioteca conectada ao backend + página da instância
 
-### 🔲 4. Launcher Minecraft
-- [ ] Baixar version manifest da Mojang (piston-meta.mojang.com)
-- [ ] Baixar client.jar, bibliotecas e assets com verificação de hash
-- [ ] Detecção/instalação de Java
-- [ ] Montar a linha de comando e lançar o jogo (modo offline primeiro)
-- [ ] Instaladores de mod loader: Fabric, Quilt, Forge, NeoForge
+### ✅ 4. Launcher Minecraft
+- [x] Version manifest da Mojang (piston-meta) com cache offline
+- [x] Baixar client.jar, bibliotecas e assets com verificação sha1 e retry
+- [x] Java automático por versão (Temurin/Adoptium), com override manual
+- [x] Montar a linha de comando e lançar o jogo (modo offline)
+- [x] Mod loaders: Fabric e Quilt (perfis via meta oficial)
+- [ ] Forge e NeoForge (instalador com processors — etapa futura)
 
-### 🔲 5. Instalação de conteúdo
-- [ ] Botão "Instalar" baixa o mod/shader/textura para dentro de uma instância
-- [ ] Resolução de dependências de mods
-- [ ] Importar/exportar modpacks (.mrpack)
-- [ ] Verificar atualizações de mods instalados
+### ✅ 5. Instalação de conteúdo
+- [x] Botão "Instalar" escolhe a instância e baixa mod/shader/textura/datapack
+- [x] Resolução de dependências obrigatórias de mods
+- [x] Importar modpacks .mrpack (índice + overrides) criando instância
+- [ ] Verificar atualizações de mods instalados (futuro)
+- [ ] Exportar modpack (futuro)
 
-### 🔲 6. Conta Microsoft
-- [ ] Registrar app no Azure + formulário de aprovação da Mojang (ação manual do usuário)
-- [ ] Fluxo OAuth device code → token Xbox Live → XSTS → token Minecraft
-- [ ] Perfil, skins e capas
+### ✅ 6. Conta Microsoft (código pronto; requer aprovação da Mojang)
+- [x] Fluxo OAuth device code → Xbox Live → XSTS → token Minecraft → perfil
+- [x] Múltiplas contas, conta ativa, renovação automática de token
+- [ ] **Ação manual**: registrar app no Azure + formulário de aprovação da Mojang
+      e colar o Client ID nas Configurações
+- [ ] Skins e capas (futuro)
 
-### 🔲 7. Extras
-- [ ] Fila de downloads com progresso
-- [ ] Configurações persistentes (Java, memória, diretórios)
-- [ ] Logs do jogo em tempo real
-- [ ] Empacotar instalador (.msi/.exe)
+### 🔶 7. Extras
+- [x] Painel de progresso de downloads (eventos Rust → frontend)
+- [x] Configurações persistentes (memória, nome offline, client ID, Java)
+- [x] Logs do jogo em tempo real na página da instância
+- [ ] Empacotar instalador (.msi/.exe) — `npm run tauri build`
 
 ## Referências
 - Código-fonte oficial: https://github.com/modrinth/code (backend do launcher: `packages/app-lib`, "theseus")

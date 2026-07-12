@@ -1,8 +1,14 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { useLauncherStore } from './stores/launcher';
+import ProgressPanel from './components/ProgressPanel.vue';
 
 const router = useRouter();
 const route = useRoute();
+const store = useLauncherStore();
+
+onMounted(() => store.init());
 
 const navItems = [
   { name: 'home', path: '/', label: 'Início', icon: 'home' },
@@ -62,7 +68,18 @@ function isActive(item: { name: string }) {
             />
           </svg>
         </button>
-        <button class="avatar" title="Entrar com conta Microsoft (em breve)">?</button>
+        <button
+          class="avatar"
+          :title="store.activeAccount ? store.activeAccount.name : 'Entrar com conta Microsoft'"
+          @click="router.push('/settings')"
+        >
+          <img
+            v-if="store.activeAccount"
+            :src="`https://mc-heads.net/avatar/${store.activeAccount.uuid}/40`"
+            alt=""
+          />
+          <template v-else>?</template>
+        </button>
       </div>
     </aside>
 
@@ -71,6 +88,8 @@ function isActive(item: { name: string }) {
         <component :is="Component" :key="route.fullPath" />
       </router-view>
     </main>
+
+    <ProgressPanel />
   </div>
 </template>
 
@@ -153,6 +172,13 @@ function isActive(item: { name: string }) {
   background: var(--color-button-bg);
   color: var(--color-secondary);
   font-weight: 700;
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .content {

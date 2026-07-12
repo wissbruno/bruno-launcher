@@ -11,6 +11,8 @@ import {
   type Project,
   type Version,
 } from '../api/modrinth';
+import { isTauri } from '../api/backend';
+import InstallModal from '../components/InstallModal.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -19,6 +21,8 @@ const project = ref<Project | null>(null);
 const versions = ref<Version[]>([]);
 const error = ref('');
 const tab = ref<'description' | 'versions' | 'gallery'>('description');
+const showInstall = ref(false);
+const installVersion = ref<Version | null>(null);
 
 const bodyHtml = computed(() =>
   project.value ? DOMPurify.sanitize(marked.parse(project.value.body, { async: false }) as string) : '',
@@ -34,12 +38,16 @@ onMounted(async () => {
   }
 });
 
-function download(version: Version) {
-  const file = version.files.find((f) => f.primary) ?? version.files[0];
-  if (file) {
-    // Por enquanto abre o download direto; quando o backend Rust existir,
-    // isso passa a instalar o arquivo dentro de uma instância.
-    window.open(file.url, '_blank');
+function install(version: Version | null) {
+  if (isTauri) {
+    installVersion.value = version;
+    showInstall.value = true;
+  } else if (version) {
+    // No navegador (sem backend) cai no download direto
+    const file = version.files.find((f) => f.primary) ?? version.files[0];
+    if (file) window.open(file.url, '_blank');
+  } else if (versions.value.length) {
+    install(versions.value[0]);
   }
 }
 
@@ -78,9 +86,7 @@ const typeBadge: Record<string, string> = {
             <span v-for="c in project.categories" :key="c" class="chip alt">{{ c }}</span>
           </div>
         </div>
-        <button class="btn-brand install-btn" @click="versions.length && download(versions[0])">
-          Instalar
-        </button>
+        <button class="btn-brand install-btn" @click="install(null)">Instalar</button>
       </header>
 
       <nav class="tabs">
@@ -105,7 +111,7 @@ const typeBadge: Record<string, string> = {
               {{ formatDate(v.date_published) }} · ⬇ {{ formatCount(v.downloads) }}
             </span>
           </div>
-          <button @click="download(v)">Baixar</button>
+          <button @click="install(v)">Instalar</button>
         </article>
       </section>
 
@@ -115,6 +121,13 @@ const typeBadge: Record<string, string> = {
           <figcaption v-if="img.title">{{ img.title }}</figcaption>
         </figure>
       </section>
+
+      <InstallModal
+        v-if="showInstall"
+        :project="project"
+        :version="installVersion"
+        @close="showInstall = false"
+      />
     </template>
   </div>
 </template>
