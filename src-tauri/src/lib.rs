@@ -42,6 +42,8 @@ pub fn run() {
             msauth::get_accounts,
             msauth::set_active_account,
             msauth::remove_account,
+            msauth::get_skin,
+            msauth::upload_skin,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao executar o app");

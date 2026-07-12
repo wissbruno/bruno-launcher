@@ -78,6 +78,61 @@ async fn cria_instala_e_lanca_fabric() {
     println!("[teste] SUCESSO: Minecraft rodou 40s sem crashar");
 }
 
+/// Cria uma instância NeoForge, roda o instalador oficial headless, baixa
+/// tudo e lança o jogo por 40s.
+#[tokio::test(flavor = "multi_thread")]
+async fn cria_instala_e_lanca_neoforge() {
+    let mock = tauri::test::mock_app();
+    let app = mock.handle().clone();
+    let launcher = Launcher::new().expect("launcher");
+    use tauri::Manager;
+    app.manage(Launcher::new().expect("launcher 2"));
+
+    let versions = loader::loader_versions(&launcher, "neoforge", GAME)
+        .await
+        .expect("versões do neoforge");
+    assert!(!versions.is_empty());
+    println!("[teste] neoforge {} para MC {GAME}", versions[0]);
+
+    let existing = instances::list_instances_inner(&launcher).expect("listar");
+    let instance = match existing.into_iter().find(|i| i.name == "Teste E2E NeoForge") {
+        Some(i) => i,
+        None => instances::new_instance(
+            &launcher,
+            "Teste E2E NeoForge",
+            GAME,
+            "neoforge",
+            Some(versions[0].clone()),
+            None,
+            None,
+        )
+        .expect("criar instância"),
+    };
+    println!("[teste] instância: {}", instance.id);
+
+    launch::install(&app, &launcher, &instance.id)
+        .await
+        .expect("instalar neoforge");
+    println!("[teste] instalação concluída (instalador headless ok)");
+
+    let pid = launch::launch(&app, &launcher, &instance.id, AuthSession::offline("TesteBot"))
+        .await
+        .expect("lançar jogo");
+    println!("[teste] jogo lançado, pid {pid}");
+
+    tokio::time::sleep(std::time::Duration::from_secs(40)).await;
+    let alive = std::process::Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()))
+        .unwrap_or(false);
+    let _ = std::process::Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/F", "/T"])
+        .output();
+    assert!(alive, "o Minecraft com NeoForge morreu nos primeiros 40s — veja os logs");
+    println!("[teste] SUCESSO: Minecraft + NeoForge rodou 40s sem crashar");
+}
+
 /// Instala o Mod Menu na instância de teste e confere que as dependências
 /// obrigatórias (Fabric API + Placeholder API) vieram junto.
 #[tokio::test(flavor = "multi_thread")]

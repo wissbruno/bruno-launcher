@@ -24,7 +24,7 @@ fn meta_base(loader: &str) -> Result<&'static str> {
         "fabric" => Ok("https://meta.fabricmc.net/v2"),
         "quilt" => Ok("https://meta.quiltmc.org/v3"),
         other => Err(AppError::msg(format!(
-            "Mod loader '{other}' ainda não é suportado (por enquanto: vanilla, fabric, quilt)"
+            "Mod loader '{other}' não é suportado (vanilla, fabric, quilt, forge, neoforge)"
         ))),
     }
 }
@@ -36,6 +36,11 @@ pub async fn loader_versions(
     loader: &str,
     game_version: &str,
 ) -> Result<Vec<String>> {
+    match loader {
+        "forge" => return super::forge::forge_versions(launcher, game_version).await,
+        "neoforge" => return super::forge::neoforge_versions(launcher, game_version).await,
+        _ => {}
+    }
     let base = meta_base(loader)?;
     let url = format!("{base}/versions/loader/{game_version}");
     let entries: Vec<LoaderEntry> = launcher

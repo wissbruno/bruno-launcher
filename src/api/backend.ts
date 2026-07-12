@@ -11,7 +11,7 @@ export interface Instance {
   id: string;
   name: string;
   game_version: string;
-  loader: 'vanilla' | 'fabric' | 'quilt';
+  loader: 'vanilla' | 'fabric' | 'quilt' | 'forge' | 'neoforge';
   loader_version: string | null;
   created: string;
   last_played: string | null;
@@ -118,6 +118,16 @@ export const msaPoll = (deviceCode: string) => call<PollResult>('msa_poll', { de
 export const getAccounts = () => call<AccountPublic[]>('get_accounts');
 export const setActiveAccount = (uuid: string | null) => call<void>('set_active_account', { uuid });
 export const removeAccount = (uuid: string) => call<void>('remove_account', { uuid });
+
+// Skins
+export interface SkinInfo {
+  url: string | null;
+  variant: string | null;
+  capes: string[];
+}
+export const getSkin = () => call<SkinInfo>('get_skin');
+export const uploadSkin = (pngBase64: string, variant: 'classic' | 'slim') =>
+  call<void>('upload_skin', { pngBase64, variant });
 
 // Eventos
 export function onProgress(handler: (e: ProgressEvent) => void): Promise<UnlistenFn> {

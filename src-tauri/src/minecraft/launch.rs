@@ -18,7 +18,11 @@ use super::manifest::{fetch_manifest, fetch_version_json, merge_versions, rules_
 
 /// Resolve o VersionJson final da instância (vanilla, ou perfil do loader
 /// mesclado com o vanilla).
-async fn resolve_version(launcher: &Launcher, instance: &Instance) -> Result<VersionJson> {
+async fn resolve_version<R: Runtime>(
+    app: &AppHandle<R>,
+    launcher: &Launcher,
+    instance: &Instance,
+) -> Result<VersionJson> {
     let vanilla = fetch_version_json(launcher, &instance.game_version).await?;
     if instance.loader == "vanilla" {
         return Ok(vanilla);
@@ -27,7 +31,20 @@ async fn resolve_version(launcher: &Launcher, instance: &Instance) -> Result<Ver
         .loader_version
         .clone()
         .ok_or_else(|| AppError::msg("Instância com loader mas sem versão do loader"))?;
-    let profile = loader_profile(launcher, &instance.loader, &instance.game_version, &loader_version).await?;
+    let profile = match instance.loader.as_str() {
+        "forge" | "neoforge" => {
+            super::forge::ensure_profile(
+                app,
+                launcher,
+                &instance.id,
+                &instance.loader,
+                &instance.game_version,
+                &loader_version,
+            )
+            .await?
+        }
+        _ => loader_profile(launcher, &instance.loader, &instance.game_version, &loader_version).await?,
+    };
     Ok(merge_versions(vanilla, profile))
 }
 
@@ -38,7 +55,7 @@ fn natives_dir(launcher: &Launcher, vanilla_id: &str) -> PathBuf {
 /// Baixa tudo que a instância precisa: client.jar, bibliotecas, assets e Java.
 pub async fn install<R: Runtime>(app: &AppHandle<R>, launcher: &Launcher, id: &str) -> Result<()> {
     let mut instance = load_instance(launcher, id)?;
-    let version = resolve_version(launcher, &instance).await?;
+    let version = resolve_version(app, launcher, &instance).await?;
 
     emit_progress(app, id, "Baixando o Minecraft...", 0, 1, false);
     download_client(launcher, &instance.game_version, &version).await?;
@@ -162,7 +179,7 @@ pub async fn launch<R: Runtime>(
         install(app, launcher, id).await?;
         instance = load_instance(launcher, id)?;
     }
-    let version = resolve_version(launcher, &instance).await?;
+    let version = resolve_version(app, launcher, &instance).await?;
     let s = settings::load_settings(launcher)?;
 
     let game_dir = instance_dir(launcher, id);
@@ -180,10 +197,27 @@ pub async fn launch<R: Runtime>(
             classpath.push(lib.path.to_string_lossy().to_string());
         }
     }
-    let client_jar = launcher
+    let mut client_jar = launcher
         .versions_dir()
         .join(&instance.game_version)
         .join(format!("{}.jar", instance.game_version));
+    // Forge/NeoForge: a -DignoreList do bootstraplauncher ignora o jar
+    // "<id-do-perfil>.jar" no classpath (como no launcher oficial, que baixa
+    // o client com esse nome). Com o nome vanilla, o Java criaria um módulo
+    // automático que colide com o módulo "minecraft" remendado.
+    if matches!(instance.loader.as_str(), "forge" | "neoforge") && version.id != instance.game_version {
+        let profile_jar = launcher
+            .versions_dir()
+            .join(&version.id)
+            .join(format!("{}.jar", version.id));
+        if !profile_jar.exists() {
+            if let Some(parent) = profile_jar.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::copy(&client_jar, &profile_jar)?;
+        }
+        client_jar = profile_jar;
+    }
     classpath.push(client_jar.to_string_lossy().to_string());
     let classpath_str = classpath.join(";");
 
@@ -206,6 +240,9 @@ pub async fn launch<R: Runtime>(
         ("launcher_name", "modrinth-replica".to_string()),
         ("launcher_version", "0.1.0".to_string()),
         ("classpath", classpath_str.clone()),
+        // Usadas pelo Forge/NeoForge (module path via bootstraplauncher)
+        ("library_directory", launcher.libraries_dir().to_string_lossy().to_string()),
+        ("classpath_separator", ";".to_string()),
         ("resolution_width", "1280".to_string()),
         ("resolution_height", "720".to_string()),
     ]);

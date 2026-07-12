@@ -267,10 +267,10 @@ pub async fn install_modpack<R: Runtime>(
         ("fabric", Some(v.clone()))
     } else if let Some(v) = index.dependencies.get("quilt-loader") {
         ("quilt", Some(v.clone()))
-    } else if index.dependencies.contains_key("forge") || index.dependencies.contains_key("neoforge") {
-        return Err(AppError::msg(
-            "Modpacks de Forge/NeoForge ainda não são suportados — escolha um de Fabric ou Quilt",
-        ));
+    } else if let Some(v) = index.dependencies.get("forge") {
+        ("forge", Some(v.clone()))
+    } else if let Some(v) = index.dependencies.get("neoforge") {
+        ("neoforge", Some(v.clone()))
     } else {
         ("vanilla", None)
     };

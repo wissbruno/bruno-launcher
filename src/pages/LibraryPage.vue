@@ -44,6 +44,8 @@ const loaderLabel: Record<string, string> = {
   vanilla: 'Vanilla',
   fabric: 'Fabric',
   quilt: 'Quilt',
+  forge: 'Forge',
+  neoforge: 'NeoForge',
 };
 </script>
 

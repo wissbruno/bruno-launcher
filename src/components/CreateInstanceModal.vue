@@ -13,7 +13,15 @@ const emit = defineEmits<{ close: [] }>();
 const store = useLauncherStore();
 
 const name = ref('');
-const loader = ref<'vanilla' | 'fabric' | 'quilt'>('vanilla');
+const loader = ref<'vanilla' | 'fabric' | 'quilt' | 'forge' | 'neoforge'>('vanilla');
+
+const loaderLabels = {
+  vanilla: 'Vanilla',
+  fabric: 'Fabric',
+  quilt: 'Quilt',
+  forge: 'Forge',
+  neoforge: 'NeoForge',
+} as const;
 const gameVersion = ref('');
 const showSnapshots = ref(false);
 const versions = ref<GameVersionEntry[]>([]);
@@ -86,12 +94,12 @@ async function create() {
         Mod loader
         <div class="loader-row">
           <button
-            v-for="l in ['vanilla', 'fabric', 'quilt'] as const"
+            v-for="(label, l) in loaderLabels"
             :key="l"
             :class="{ selected: loader === l }"
             @click="loader = l"
           >
-            {{ l === 'vanilla' ? 'Vanilla' : l === 'fabric' ? 'Fabric' : 'Quilt' }}
+            {{ label }}
           </button>
         </div>
       </label>

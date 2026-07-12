@@ -6,10 +6,34 @@ import {
   msaPoll,
   setActiveAccount,
   removeAccount,
+  uploadSkin,
   type DeviceCode,
 } from '../api/backend';
 
 const store = useLauncherStore();
+
+// --- Skins ---
+const skinVariant = ref<'classic' | 'slim'>('classic');
+const skinBusy = ref(false);
+const skinMsg = ref('');
+
+async function onSkinFile(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  skinBusy.value = true;
+  skinMsg.value = '';
+  try {
+    const buf = await file.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    await uploadSkin(base64, skinVariant.value);
+    skinMsg.value = 'Skin atualizada! Pode levar alguns minutos para aparecer.';
+  } catch (e) {
+    skinMsg.value = String(e);
+  } finally {
+    skinBusy.value = false;
+    (event.target as HTMLInputElement).value = '';
+  }
+}
 
 const saved = ref(false);
 const error = ref('');
@@ -97,6 +121,29 @@ async function logout(uuid: string) {
           <span v-if="account.active" class="active-badge">ativa</span>
           <button v-else class="small" @click="activate(account.uuid)">Usar</button>
           <button class="small danger" @click="logout(account.uuid)">Sair</button>
+        </div>
+
+        <div v-if="store.activeAccount" class="skin-section">
+          <img
+            :src="`https://mc-heads.net/body/${store.activeAccount.uuid}/96`"
+            class="skin-preview"
+            alt="Skin atual"
+          />
+          <div class="skin-controls">
+            <h4>Trocar skin</h4>
+            <label class="field">
+              Modelo
+              <select v-model="skinVariant" style="max-width: 160px">
+                <option value="classic">Clássico (Steve)</option>
+                <option value="slim">Fino (Alex)</option>
+              </select>
+            </label>
+            <label class="upload-btn">
+              {{ skinBusy ? 'Enviando...' : 'Escolher PNG...' }}
+              <input type="file" accept="image/png" hidden :disabled="skinBusy" @change="onSkinFile" />
+            </label>
+            <p v-if="skinMsg" class="hint">{{ skinMsg }}</p>
+          </div>
         </div>
       </template>
       <p v-else class="hint">
@@ -228,6 +275,48 @@ async function logout(uuid: string) {
 
 .danger {
   color: var(--color-red);
+}
+
+.skin-section {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-top: 0.5rem;
+}
+
+.skin-preview {
+  image-rendering: pixelated;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  padding: 0.5rem;
+}
+
+.skin-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.skin-controls h4 {
+  font-size: 13px;
+  color: var(--color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.upload-btn {
+  display: inline-block;
+  background: var(--color-button-bg);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--color-contrast);
+  width: fit-content;
+}
+
+.upload-btn:hover {
+  background: var(--color-button-bg-hover);
 }
 
 .device-code {

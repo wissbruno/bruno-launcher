@@ -28,7 +28,7 @@ stack do original — **Tauri 2 + Rust** (backend) e **Vue 3 + TypeScript + Pini
 - [x] Java automático por versão (Temurin/Adoptium), com override manual
 - [x] Montar a linha de comando e lançar o jogo (modo offline)
 - [x] Mod loaders: Fabric e Quilt (perfis via meta oficial)
-- [ ] Forge e NeoForge (instalador com processors — etapa futura)
+- [x] Forge e NeoForge (instalador oficial rodado em modo headless)
 
 ### ✅ 5. Instalação de conteúdo
 - [x] Botão "Instalar" escolhe a instância e baixa mod/shader/textura/datapack
@@ -41,14 +41,17 @@ stack do original — **Tauri 2 + Rust** (backend) e **Vue 3 + TypeScript + Pini
 - [x] Fluxo OAuth device code → Xbox Live → XSTS → token Minecraft → perfil
 - [x] Múltiplas contas, conta ativa, renovação automática de token
 - [ ] **Ação manual**: registrar app no Azure + formulário de aprovação da Mojang
-      e colar o Client ID nas Configurações
-- [ ] Skins e capas (futuro)
+      e colar o Client ID nas Configurações — guia em docs/LOGIN-MICROSOFT.md
+- [x] Skins: visualização e upload (classic/slim) para a conta ativa
 
 ### 🔶 7. Extras
 - [x] Painel de progresso de downloads (eventos Rust → frontend)
 - [x] Configurações persistentes (memória, nome offline, client ID, Java)
 - [x] Logs do jogo em tempo real na página da instância
-- [ ] Empacotar instalador (.msi/.exe) — `npm run tauri build`
+- [x] Instalador (.msi/.exe) via `npm run tauri build`
+- [ ] Verificar atualizações de mods instalados (futuro)
+- [ ] Exportar modpack (futuro)
+- [ ] Ícone personalizado do app (futuro — `npm run tauri icon <png>`)
 
 ## Referências
 - Código-fonte oficial: https://github.com/modrinth/code (backend do launcher: `packages/app-lib`, "theseus")

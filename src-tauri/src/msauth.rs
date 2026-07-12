@@ -290,6 +290,91 @@ pub async fn active_session(launcher: &Launcher) -> Result<Option<AuthSession>> 
     }))
 }
 
+// ------------------------- Skins -------------------------
+
+#[derive(Serialize)]
+pub struct SkinInfo {
+    pub url: Option<String>,
+    pub variant: Option<String>,
+    pub capes: Vec<String>,
+}
+
+/// Perfil da conta ativa: skin atual (url + variante) e capas disponíveis.
+#[tauri::command]
+pub async fn get_skin(launcher: State<'_, Launcher>) -> Result<SkinInfo> {
+    let session = active_session(&launcher)
+        .await?
+        .ok_or_else(|| AppError::msg("Nenhuma conta Microsoft ativa"))?;
+    let profile: serde_json::Value = launcher
+        .http
+        .get("https://api.minecraftservices.com/minecraft/profile")
+        .bearer_auth(&session.access_token)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+
+    let active_skin = profile["skins"]
+        .as_array()
+        .and_then(|skins| skins.iter().find(|s| s["state"] == "ACTIVE"));
+    Ok(SkinInfo {
+        url: active_skin.and_then(|s| s["url"].as_str().map(String::from)),
+        variant: active_skin.and_then(|s| s["variant"].as_str().map(String::from)),
+        capes: profile["capes"]
+            .as_array()
+            .map(|capes| {
+                capes
+                    .iter()
+                    .filter_map(|c| c["alias"].as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default(),
+    })
+}
+
+/// Troca a skin da conta ativa. `png_base64` é o conteúdo do arquivo PNG;
+/// `variant` é "classic" ou "slim".
+#[tauri::command]
+pub async fn upload_skin(
+    launcher: State<'_, Launcher>,
+    png_base64: String,
+    variant: String,
+) -> Result<()> {
+    use base64::Engine;
+    if variant != "classic" && variant != "slim" {
+        return Err(AppError::msg("Variante deve ser 'classic' ou 'slim'"));
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(png_base64.trim())
+        .map_err(|_| AppError::msg("PNG inválido (base64)"))?;
+    if bytes.len() > 512 * 1024 {
+        return Err(AppError::msg("Arquivo muito grande — skins têm no máximo 24 KB"));
+    }
+    let session = active_session(&launcher)
+        .await?
+        .ok_or_else(|| AppError::msg("Nenhuma conta Microsoft ativa"))?;
+
+    let form = reqwest::multipart::Form::new()
+        .text("variant", variant)
+        .part(
+            "file",
+            reqwest::multipart::Part::bytes(bytes)
+                .file_name("skin.png")
+                .mime_str("image/png")
+                .map_err(|e| AppError::msg(e.to_string()))?,
+        );
+    launcher
+        .http
+        .post("https://api.minecraftservices.com/minecraft/profile/skins")
+        .bearer_auth(&session.access_token)
+        .multipart(form)
+        .send()
+        .await?
+        .error_for_status()?;
+    Ok(())
+}
+
 // ------------------------- Comandos de conta -------------------------
 
 #[tauri::command]

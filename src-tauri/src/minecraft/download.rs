@@ -167,7 +167,19 @@ pub async fn download_libraries<R: Runtime>(
             let url = lib.url.clone();
             let path = lib.path.clone();
             let sha1 = lib.sha1.clone();
-            async move { download_file(launcher, &url, &path, sha1.as_deref()).await }
+            async move {
+                if url.is_empty() {
+                    // Biblioteca gerada localmente (instalador do Forge/NeoForge)
+                    if path.exists() {
+                        return Ok(());
+                    }
+                    return Err(crate::error::AppError::msg(format!(
+                        "Biblioteca local não encontrada (rode a instalação de novo): {}",
+                        path.display()
+                    )));
+                }
+                download_file(launcher, &url, &path, sha1.as_deref()).await
+            }
         })
         .collect();
     let mut stream = futures::stream::iter(futs).buffer_unordered(16);
