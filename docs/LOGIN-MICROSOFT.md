@@ -8,23 +8,30 @@ Minecraft. É gratuito; a espera pela aprovação da Mojang é a parte demorada
 
 ## Etapa 1 — Criar o registro no portal Azure (~10 minutos)
 
+Nomes em **português** (portal em pt-BR), com o original em inglês entre
+parênteses caso o portal apareça em inglês.
+
 1. Acesse https://portal.azure.com e entre com qualquer conta Microsoft
    (a mesma do Minecraft serve). Não precisa de assinatura paga.
-2. Na busca do topo, procure **"App registrations"** (Registros de aplicativo)
-   e abra.
-3. Clique em **"New registration"** (Novo registro):
-   - **Name**: qualquer nome, ex. `Modrinth Replica do Bruno`
-   - **Supported account types**: escolha
-     **"Personal Microsoft accounts only"** (Somente contas pessoais da
-     Microsoft) — importante, o login do Minecraft usa contas pessoais.
-   - **Redirect URI**: deixe em branco.
-   - Clique em **Register**.
-4. Na página do app criado, copie o **"Application (client) ID"** — um UUID
+2. Na busca do topo, procure **"Registros de aplicativo"**
+   (*App registrations*) e abra.
+3. Clique em **"+ Novo registro"** (*New registration*):
+   - **Nome**: qualquer nome, ex. `Launcher do Bruno`
+   - **Tipos de conta com suporte** (*Supported account types*): escolha
+     **"Somente contas pessoais da Microsoft"** (*Personal Microsoft
+     accounts only*) — geralmente a última opção; NÃO escolha as de
+     "diretório organizacional".
+   - **URI de Redirecionamento (opcional)**: deixe em branco.
+   - Clique em **"Registrar"**.
+4. Na página **"Visão geral"** (*Overview*) do app criado, copie o
+   **"ID do aplicativo (cliente)"** (*Application (client) ID*) — um UUID
    tipo `1a2b3c4d-...`. **Esse é o Client ID.**
-5. No menu lateral, vá em **Authentication** (Autenticação):
-   - Role até **"Advanced settings"** → **"Allow public client flows"**
-     (Permitir fluxos de cliente público) e marque **Yes**.
-   - Salve. (Sem isso o *device code flow* não funciona.)
+5. No menu lateral, vá em **"Autenticação"** (*Authentication*):
+   - Role até **"Configurações avançadas"** (*Advanced settings*) →
+     **"Permitir fluxos de cliente público"** (*Allow public client
+     flows*, "Habilitar os seguintes fluxos de dispositivo móvel e
+     desktop") e marque **"Sim"**.
+   - Clique em **"Salvar"**. (Sem isso o *device code flow* não funciona.)
 
 ## Etapa 2 — Pedir aprovação da Mojang (a parte que demora)
 
