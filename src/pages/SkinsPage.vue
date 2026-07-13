@@ -12,9 +12,11 @@ import {
   type SavedSkin,
 } from '../api/backend';
 import SkinFace from '../components/SkinFace.vue';
+import SkinViewer3D from '../components/SkinViewer3D.vue';
 
 const store = useLauncherStore();
 const skins = ref<SavedSkin[]>([]);
+const preview3d = ref<SavedSkin | null>(null);
 const variant = ref<'classic' | 'slim'>('classic');
 const busy = ref(false);
 const msg = ref('');
@@ -174,7 +176,9 @@ async function apply(skin: SavedSkin) {
 
     <div v-if="skins.length" class="grid">
       <article v-for="skin in skins" :key="skin.id" class="card skin-card" :class="{ fav: skin.favorite }">
-        <SkinFace :png-base64="skin.png_base64" :size="88" />
+        <button class="face-btn" title="Ver em 3D" @click="preview3d = skin">
+          <SkinFace :png-base64="skin.png_base64" :size="88" />
+        </button>
         <div class="info">
           <h3>{{ skin.name }}</h3>
           <span class="variant">{{ skin.variant === 'slim' ? 'Fino' : 'Clássico' }}</span>
@@ -210,6 +214,20 @@ async function apply(skin: SavedSkin) {
     </div>
 
     <p v-else class="note card">Galeria disponível apenas no app desktop.</p>
+
+    <div v-if="preview3d" class="overlay" @click.self="preview3d = null">
+      <div class="preview-modal card">
+        <h3>{{ preview3d.name }}</h3>
+        <SkinViewer3D
+          :png-base64="preview3d.png_base64"
+          :variant="preview3d.variant"
+          :width="220"
+          :height="300"
+        />
+        <span class="tip">Arraste para girar 🖱️</span>
+        <button @click="preview3d = null">Fechar</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -376,5 +394,38 @@ async function apply(skin: SavedSkin) {
 
 .error {
   color: var(--color-red);
+}
+
+.face-btn {
+  padding: 0;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.face-btn:hover {
+  filter: brightness(1.15);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+}
+
+.preview-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+}
+
+.preview-modal .tip {
+  font-size: 12px;
+  color: var(--color-secondary);
 }
 </style>

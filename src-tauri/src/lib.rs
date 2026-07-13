@@ -25,6 +25,7 @@ pub fn run() {
             instances::set_instance_icon,
             instances::get_instance_icon,
             instances::set_instance_pinned,
+            instances::set_instance_details,
             instances::open_instance_folder,
             instances::list_instance_content,
             instances::remove_instance_content,
@@ -38,6 +39,9 @@ pub fn run() {
             // Conteúdo Modrinth
             content::install_content,
             content::install_modpack,
+            content::check_mod_updates,
+            content::apply_mod_updates,
+            content::export_modpack,
             // Configurações
             settings::get_settings,
             settings::set_settings,

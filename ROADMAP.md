@@ -55,9 +55,10 @@ stack do original — **Tauri 2 + Rust** (backend) e **Vue 3 + TypeScript + Pini
 - [x] Ícone personalizado por instância (upload PNG/JPG, igual ao Modrinth)
 - [x] Fixar instâncias favoritas no topo da biblioteca
 - [x] Duplicar instância e ordenar biblioteca (recentes/mais jogadas/nome)
-- [ ] Verificar atualizações de mods instalados (futuro)
-- [ ] Exportar modpack (futuro)
-- [ ] Notas/cor de destaque por instância (futuro)
+- [x] Verificar e aplicar atualizações de mods (por hash na API Modrinth)
+- [x] Exportar modpack .mrpack (índice + overrides) para Downloads
+- [x] Notas e cor de destaque por instância
+- [x] Preview 3D da skin (skinview3d) com auto-rotate e arrastar
 - [ ] Adicionar amigos (depende de login online + API social limitada — futuro)
 - [ ] Ícone personalizado do app (futuro — `npm run tauri icon <png>`)
 

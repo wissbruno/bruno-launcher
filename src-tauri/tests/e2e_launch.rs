@@ -177,6 +177,96 @@ async fn contabiliza_playtime() {
     println!("[teste] SUCESSO: playtime somou {}s", after - before);
 }
 
+/// Instala uma versão ANTIGA de um mod e confere que check_mod_updates
+/// detecta que há atualização disponível.
+#[tokio::test(flavor = "multi_thread")]
+async fn detecta_atualizacao_de_mod() {
+    use tauri::Manager;
+    let mock = tauri::test::mock_app();
+    let app = mock.handle().clone();
+    app.manage(Launcher::new().expect("launcher"));
+    let launcher = app.state::<Launcher>();
+
+    let instance = test_instance(&launcher).await;
+
+    // Pega a versão MAIS ANTIGA do Mod Menu para 1.21.1/fabric
+    let versions: serde_json::Value = launcher
+        .http
+        .get("https://api.modrinth.com/v2/project/modmenu/version?game_versions=[\"1.21.1\"]&loaders=[\"fabric\"]")
+        .send()
+        .await
+        .expect("listar versões")
+        .json()
+        .await
+        .expect("json");
+    let arr = versions.as_array().expect("array");
+    let oldest = arr.last().expect("tem versões");
+    let old_id = oldest["id"].as_str().unwrap().to_string();
+
+    // Limpa mods antes e instala a versão antiga
+    let mods_dir = launcher.instances_dir().join(&instance.id).join("mods");
+    if mods_dir.exists() {
+        for e in std::fs::read_dir(&mods_dir).unwrap().flatten() {
+            let n = e.file_name().to_string_lossy().to_lowercase();
+            if n.contains("modmenu") {
+                std::fs::remove_file(e.path()).ok();
+            }
+        }
+    }
+    content::install_content_inner(&app, &launcher, instance.id.clone(), "modmenu".into(), Some(old_id))
+        .await
+        .expect("instalar versão antiga");
+
+    let updates = content::check_mod_updates(launcher, instance.id.clone())
+        .await
+        .expect("checar updates");
+    println!("[teste] {} atualização(ões) detectada(s)", updates.len());
+    assert!(
+        updates.iter().any(|u| u.old_filename.to_lowercase().contains("modmenu")),
+        "não detectou atualização do modmenu: {:?}",
+        updates.iter().map(|u| &u.old_filename).collect::<Vec<_>>()
+    );
+    println!("[teste] SUCESSO: atualização do Mod Menu detectada");
+}
+
+/// Exporta a instância de teste como .mrpack e confere que o arquivo foi
+/// criado com um índice válido.
+#[tokio::test(flavor = "multi_thread")]
+async fn exporta_mrpack() {
+    use tauri::Manager;
+    let mock = tauri::test::mock_app();
+    let app = mock.handle().clone();
+    app.manage(Launcher::new().expect("launcher"));
+    let launcher = app.state::<Launcher>();
+
+    let instance = test_instance(&launcher).await;
+    // Garante ao menos um mod conhecido na instância (Sodium)
+    let _ = content::install_content_inner(
+        &app,
+        &launcher,
+        instance.id.clone(),
+        "sodium".into(),
+        None,
+    )
+    .await;
+
+    let path = content::export_modpack(launcher.clone(), instance.id.clone())
+        .await
+        .expect("exportar mrpack");
+    println!("[teste] mrpack em: {path}");
+
+    // Abre o zip e confere o índice
+    let file = std::fs::File::open(&path).expect("abrir mrpack");
+    let mut zip = zip::ZipArchive::new(file).expect("zip válido");
+    let mut index = zip.by_name("modrinth.index.json").expect("tem index");
+    let mut text = String::new();
+    std::io::Read::read_to_string(&mut index, &mut text).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&text).expect("index json");
+    assert_eq!(json["formatVersion"], 1);
+    assert!(json["files"].as_array().map(|f| !f.is_empty()).unwrap_or(false), "sem arquivos no index");
+    println!("[teste] SUCESSO: mrpack com {} arquivo(s)", json["files"].as_array().unwrap().len());
+}
+
 /// Importa a skin de um jogador conhecido (Notch) pela API oficial da Mojang
 /// e confere que virou uma skin na galeria.
 #[tokio::test(flavor = "multi_thread")]

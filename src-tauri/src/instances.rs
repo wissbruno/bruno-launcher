@@ -32,6 +32,12 @@ pub struct Instance {
     /// instâncias fixadas aparecem no topo da biblioteca
     #[serde(default)]
     pub pinned: bool,
+    /// anotações livres do usuário sobre a instância
+    #[serde(default)]
+    pub notes: Option<String>,
+    /// cor de destaque (hex) escolhida para a instância
+    #[serde(default)]
+    pub accent_color: Option<String>,
 }
 
 pub fn instance_dir(launcher: &Launcher, id: &str) -> PathBuf {
@@ -112,6 +118,8 @@ pub fn new_instance(
         playtime_seconds: 0,
         custom_icon: false,
         pinned: false,
+        notes: None,
+        accent_color: None,
     };
     save_instance(launcher, &instance)?;
     Ok(instance)
@@ -275,6 +283,21 @@ pub fn set_instance_pinned(
 ) -> Result<Instance> {
     let mut instance = load_instance(&launcher, &id)?;
     instance.pinned = pinned;
+    save_instance(&launcher, &instance)?;
+    Ok(instance)
+}
+
+/// Atualiza anotações e/ou cor de destaque da instância.
+#[tauri::command]
+pub fn set_instance_details(
+    launcher: State<'_, Launcher>,
+    id: String,
+    notes: Option<String>,
+    accent_color: Option<String>,
+) -> Result<Instance> {
+    let mut instance = load_instance(&launcher, &id)?;
+    instance.notes = notes.filter(|n| !n.trim().is_empty());
+    instance.accent_color = accent_color.filter(|c| !c.trim().is_empty());
     save_instance(&launcher, &instance)?;
     Ok(instance)
 }

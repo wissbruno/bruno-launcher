@@ -13,8 +13,13 @@ import {
   removeInstanceContent,
   setInstanceIcon,
   setInstancePinned,
+  setInstanceDetails,
+  checkModUpdates,
+  applyModUpdates,
+  exportModpack,
   formatPlaytime,
   type ContentFile,
+  type ModUpdate,
 } from '../api/backend';
 import InstanceIcon from '../components/InstanceIcon.vue';
 
@@ -132,6 +137,75 @@ async function togglePin() {
   await store.refreshInstances();
 }
 
+// --- Atualizar mods ---
+const updates = ref<ModUpdate[]>([]);
+const checkingUpdates = ref(false);
+const updateMsg = ref('');
+
+async function checkUpdates() {
+  checkingUpdates.value = true;
+  updateMsg.value = '';
+  error.value = '';
+  try {
+    updates.value = await checkModUpdates(id.value);
+    updateMsg.value = updates.value.length
+      ? `${updates.value.length} atualização(ões) disponível(is)`
+      : 'Todos os mods estão atualizados ✓';
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    checkingUpdates.value = false;
+  }
+}
+
+async function applyUpdates() {
+  checkingUpdates.value = true;
+  try {
+    const done = await applyModUpdates(id.value);
+    updateMsg.value = `${done.length} mod(s) atualizado(s)!`;
+    updates.value = [];
+    refreshContent();
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    checkingUpdates.value = false;
+  }
+}
+
+// --- Notas e cor ---
+const editingDetails = ref(false);
+const notesDraft = ref('');
+const colorDraft = ref('');
+const accentColors = ['#1bd96a', '#4f9cff', '#c78aff', '#ffa347', '#ff496e', ''];
+
+function openDetails() {
+  notesDraft.value = instance.value?.notes ?? '';
+  colorDraft.value = instance.value?.accent_color ?? '';
+  editingDetails.value = true;
+}
+
+async function saveDetails() {
+  await setInstanceDetails(id.value, notesDraft.value || null, colorDraft.value || null);
+  await store.refreshInstances();
+  editingDetails.value = false;
+}
+
+// --- Exportar modpack ---
+const exporting = ref(false);
+
+async function doExport() {
+  exporting.value = true;
+  error.value = '';
+  try {
+    const path = await exportModpack(id.value);
+    updateMsg.value = `Modpack exportado em: ${path}`;
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    exporting.value = false;
+  }
+}
+
 function formatSize(bytes: number): string {
   if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -142,7 +216,10 @@ function formatSize(bytes: number): string {
   <div v-if="instance" class="instance-page">
     <button class="back" @click="router.push('/library')">← Biblioteca</button>
 
-    <header class="card header">
+    <header
+      class="card header"
+      :style="instance.accent_color ? { borderLeft: `4px solid ${instance.accent_color}` } : {}"
+    >
       <label class="icon-edit" title="Trocar ícone da instância">
         <InstanceIcon :instance="instance" :size="88" />
         <span class="icon-overlay">✎</span>
@@ -187,6 +264,35 @@ function formatSize(bytes: number): string {
     </header>
 
     <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="updateMsg" class="ok">{{ updateMsg }}</p>
+
+    <section v-if="instance.notes || editingDetails" class="card notes-card">
+      <template v-if="editingDetails">
+        <textarea v-model="notesDraft" placeholder="Anotações sobre esta instância..." rows="3"></textarea>
+        <div class="color-row">
+          <span>Cor:</span>
+          <button
+            v-for="c in accentColors"
+            :key="c || 'none'"
+            class="swatch"
+            :class="{ sel: colorDraft === c }"
+            :style="{ background: c || 'transparent', borderColor: c || 'var(--color-divider)' }"
+            :title="c || 'Sem cor'"
+            @click="colorDraft = c"
+          >
+            {{ c ? '' : '∅' }}
+          </button>
+        </div>
+        <div class="notes-actions">
+          <button @click="editingDetails = false">Cancelar</button>
+          <button class="btn-brand" @click="saveDetails">Salvar</button>
+        </div>
+      </template>
+      <template v-else>
+        <p class="notes-text">{{ instance.notes }}</p>
+        <button class="small" @click="openDetails">Editar</button>
+      </template>
+    </section>
 
     <nav class="tabs">
       <button :class="{ active: tab === 'content' }" @click="tab = 'content'; refreshContent()">
@@ -203,6 +309,24 @@ function formatSize(bytes: number): string {
         >
           + Adicionar conteúdo
         </button>
+        <button :disabled="checkingUpdates" @click="checkUpdates">
+          {{ checkingUpdates ? 'Verificando...' : '🔄 Verificar atualizações' }}
+        </button>
+        <button v-if="updates.length" class="btn-brand" :disabled="checkingUpdates" @click="applyUpdates">
+          ⬆ Atualizar {{ updates.length }} mod(s)
+        </button>
+        <button :disabled="exporting" @click="doExport">
+          {{ exporting ? 'Exportando...' : '📦 Exportar .mrpack' }}
+        </button>
+        <button v-if="!instance.notes && !editingDetails" @click="openDetails">📝 Notas/cor</button>
+      </div>
+
+      <div v-if="updates.length" class="updates card">
+        <div v-for="up in updates" :key="up.old_filename" class="update-row">
+          <span>{{ up.old_filename }}</span>
+          <span class="arrow">→</span>
+          <span class="new">{{ up.new_filename }}</span>
+        </div>
       </div>
       <template v-if="content.length">
         <div v-for="(files, folder) in groupedContent" :key="folder" class="group">
@@ -268,6 +392,91 @@ function formatSize(bytes: number): string {
 
 .pin.active {
   color: var(--color-orange);
+}
+
+.notes-card {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.notes-text {
+  margin: 0;
+  color: var(--color-base);
+  white-space: pre-wrap;
+}
+
+.notes-card textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  background: var(--color-button-bg);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-contrast);
+  padding: 0.6rem;
+  outline: none;
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 13px;
+  color: var(--color-secondary);
+}
+
+.swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid;
+  color: var(--color-secondary);
+}
+
+.swatch.sel {
+  box-shadow: 0 0 0 2px var(--color-contrast);
+}
+
+.notes-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.updates {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.update-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 13px;
+}
+
+.update-row .arrow {
+  color: var(--color-secondary);
+}
+
+.update-row .new {
+  color: var(--color-brand);
+}
+
+.content-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ok {
+  color: var(--color-brand);
+  word-break: break-all;
 }
 
 .head-info {

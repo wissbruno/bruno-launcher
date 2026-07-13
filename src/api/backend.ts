@@ -21,6 +21,8 @@ export interface Instance {
   playtime_seconds: number;
   custom_icon: boolean;
   pinned: boolean;
+  notes: string | null;
+  accent_color: string | null;
 }
 
 export interface ContentFile {
@@ -107,6 +109,8 @@ export const setInstanceIcon = (id: string, pngBase64: string) =>
 export const getInstanceIcon = (id: string) => call<string>('get_instance_icon', { id });
 export const setInstancePinned = (id: string, pinned: boolean) =>
   call<Instance>('set_instance_pinned', { id, pinned });
+export const setInstanceDetails = (id: string, notes: string | null, accentColor: string | null) =>
+  call<Instance>('set_instance_details', { id, notes, accentColor });
 export const openInstanceFolder = (id: string) => call<void>('open_instance_folder', { id });
 export const listInstanceContent = (id: string) => call<ContentFile[]>('list_instance_content', { id });
 export const removeInstanceContent = (id: string, folder: string, filename: string) =>
@@ -127,6 +131,20 @@ export const installContent = (instanceId: string, projectId: string, versionId?
   call<string[]>('install_content', { instanceId, projectId, versionId });
 export const installModpack = (projectId: string, versionId?: string) =>
   call<Instance>('install_modpack', { projectId, versionId });
+
+// Atualização de mods e export
+export interface ModUpdate {
+  old_filename: string;
+  new_filename: string;
+  new_version: string;
+  project_id: string;
+}
+export const checkModUpdates = (instanceId: string) =>
+  call<ModUpdate[]>('check_mod_updates', { instanceId });
+export const applyModUpdates = (instanceId: string) =>
+  call<string[]>('apply_mod_updates', { instanceId });
+export const exportModpack = (instanceId: string) =>
+  call<string>('export_modpack', { instanceId });
 
 // Configurações
 export const getSettings = () => call<Settings>('get_settings');
