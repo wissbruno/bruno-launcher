@@ -4,6 +4,7 @@ pub mod instances;
 pub mod minecraft;
 pub mod msauth;
 pub mod settings;
+pub mod skins;
 pub mod state;
 
 use state::Launcher;
@@ -20,6 +21,7 @@ pub fn run() {
             instances::create_instance,
             instances::delete_instance,
             instances::rename_instance,
+            instances::duplicate_instance,
             instances::open_instance_folder,
             instances::list_instance_content,
             instances::remove_instance_content,
@@ -44,6 +46,12 @@ pub fn run() {
             msauth::remove_account,
             msauth::get_skin,
             msauth::upload_skin,
+            // Galeria de skins
+            skins::list_saved_skins,
+            skins::add_saved_skin,
+            skins::delete_saved_skin,
+            skins::set_favorite_skin,
+            skins::apply_saved_skin,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao executar o app");

@@ -290,7 +290,13 @@ pub async fn launch<R: Runtime>(
 
     let mut child = cmd.spawn()?;
     let pid = child.id().unwrap_or(0);
-    launcher.running.lock().unwrap().insert(id.to_string(), pid);
+    launcher.running.lock().unwrap().insert(
+        id.to_string(),
+        crate::state::RunningGame {
+            pid,
+            started: std::time::Instant::now(),
+        },
+    );
 
     instance.last_played = Some(chrono::Utc::now().to_rfc3339());
     save_instance(launcher, &instance)?;
@@ -309,8 +315,27 @@ pub async fn launch<R: Runtime>(
         let status = child.wait().await;
         let code = status.ok().and_then(|st| st.code()).unwrap_or(-1);
         let launcher = app2.state::<Launcher>();
-        launcher.running.lock().unwrap().remove(&id2);
-        let _ = app2.emit("game-exit", GameExit { id: id2, code });
+        // Calcula a duração da sessão e acumula no playtime da instância
+        let elapsed = launcher
+            .running
+            .lock()
+            .unwrap()
+            .remove(&id2)
+            .map(|g| g.started.elapsed().as_secs())
+            .unwrap_or(0);
+        // Só conta se o jogo ficou aberto tempo razoável (evita contar crashes
+        // instantâneos de inicialização)
+        if elapsed >= 3 {
+            let _ = crate::instances::add_playtime(&launcher, &id2, elapsed);
+        }
+        let _ = app2.emit(
+            "game-exit",
+            GameExit {
+                id: id2,
+                code,
+                session_seconds: elapsed,
+            },
+        );
     });
 
     Ok(pid)
@@ -320,6 +345,7 @@ pub async fn launch<R: Runtime>(
 struct GameExit {
     id: String,
     code: i32,
+    session_seconds: u64,
 }
 
 #[derive(Clone, Serialize)]
@@ -404,7 +430,7 @@ pub async fn launch_instance<R: Runtime>(
 
 #[tauri::command]
 pub fn kill_instance(launcher: State<'_, Launcher>, id: String) -> Result<()> {
-    let pid = launcher.running.lock().unwrap().get(&id).copied();
+    let pid = launcher.running.lock().unwrap().get(&id).map(|g| g.pid);
     if let Some(pid) = pid {
         let _ = std::process::Command::new("taskkill")
             .args(["/PID", &pid.to_string(), "/F"])

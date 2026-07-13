@@ -341,6 +341,14 @@ pub async fn upload_skin(
     png_base64: String,
     variant: String,
 ) -> Result<()> {
+    upload_skin_inner(&launcher, png_base64, variant).await
+}
+
+pub async fn upload_skin_inner(
+    launcher: &Launcher,
+    png_base64: String,
+    variant: String,
+) -> Result<()> {
     use base64::Engine;
     if variant != "classic" && variant != "slim" {
         return Err(AppError::msg("Variante deve ser 'classic' ou 'slim'"));
@@ -351,7 +359,7 @@ pub async fn upload_skin(
     if bytes.len() > 512 * 1024 {
         return Err(AppError::msg("Arquivo muito grande — skins têm no máximo 24 KB"));
     }
-    let session = active_session(&launcher)
+    let session = active_session(launcher)
         .await?
         .ok_or_else(|| AppError::msg("Nenhuma conta Microsoft ativa"))?;
 

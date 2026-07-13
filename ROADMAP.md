@@ -49,8 +49,12 @@ stack do original — **Tauri 2 + Rust** (backend) e **Vue 3 + TypeScript + Pini
 - [x] Configurações persistentes (memória, nome offline, client ID, Java)
 - [x] Logs do jogo em tempo real na página da instância
 - [x] Instalador (.msi/.exe) via `npm run tauri build`
+- [x] Contador de horas de jogatina por instância + total
+- [x] Galeria de skins local (importar, preview de rosto, favoritar, aplicar)
+- [x] Duplicar instância e ordenar biblioteca (recentes/mais jogadas/nome)
 - [ ] Verificar atualizações de mods instalados (futuro)
 - [ ] Exportar modpack (futuro)
+- [ ] Adicionar amigos (depende de login online + API social limitada — futuro)
 - [ ] Ícone personalizado do app (futuro — `npm run tauri icon <png>`)
 
 ## Referências

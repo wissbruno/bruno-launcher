@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useLauncherStore } from '../stores/launcher';
-import { launchInstance, killInstance, prepareInstance } from '../api/backend';
+import {
+  launchInstance,
+  killInstance,
+  prepareInstance,
+  duplicateInstance,
+  formatPlaytime,
+} from '../api/backend';
 import CreateInstanceModal from '../components/CreateInstanceModal.vue';
 import InstanceIcon from '../components/InstanceIcon.vue';
 import type { Instance } from '../api/backend';
@@ -11,6 +17,18 @@ const store = useLauncherStore();
 const router = useRouter();
 const showCreate = ref(false);
 const error = ref('');
+const sortBy = ref<'recent' | 'played' | 'name'>('recent');
+
+const sortedInstances = computed(() => {
+  const list = [...store.instances];
+  if (sortBy.value === 'played') return list.sort((a, b) => b.playtime_seconds - a.playtime_seconds);
+  if (sortBy.value === 'name') return list.sort((a, b) => a.name.localeCompare(b.name));
+  return list; // 'recent' já vem ordenado por criação do backend
+});
+
+const totalPlaytime = computed(() =>
+  store.instances.reduce((sum, i) => sum + i.playtime_seconds, 0),
+);
 
 onMounted(() => {
   store.init();
@@ -40,6 +58,17 @@ function retryInstall(instance: Instance) {
   prepareInstance(instance.id).catch((e) => (error.value = String(e)));
 }
 
+async function duplicate(instance: Instance) {
+  try {
+    await duplicateInstance(instance.id);
+    await store.refreshInstances();
+  } catch (e) {
+    error.value = String(e);
+  }
+}
+
+const fmt = formatPlaytime;
+
 const loaderLabel: Record<string, string> = {
   vanilla: 'Vanilla',
   fabric: 'Fabric',
@@ -66,11 +95,31 @@ const loaderLabel: Record<string, string> = {
       (<code>npm run tauri dev</code>).
     </p>
 
+    <div v-if="store.instances.length" class="stats-bar">
+      <div class="stat">
+        <strong>{{ store.instances.length }}</strong>
+        <span>{{ store.instances.length === 1 ? 'instância' : 'instâncias' }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ fmt(totalPlaytime) }}</strong>
+        <span>de jogatina total</span>
+      </div>
+      <div class="spacer"></div>
+      <label class="sort">
+        Ordenar:
+        <select v-model="sortBy">
+          <option value="recent">Mais recentes</option>
+          <option value="played">Mais jogadas</option>
+          <option value="name">Nome</option>
+        </select>
+      </label>
+    </div>
+
     <p v-if="error" class="error">{{ error }}</p>
 
     <div v-if="store.instances.length" class="grid">
       <article
-        v-for="instance in store.instances"
+        v-for="instance in sortedInstances"
         :key="instance.id"
         class="card instance"
         @click="router.push(`/instance/${instance.id}`)"
@@ -83,6 +132,7 @@ const loaderLabel: Record<string, string> = {
           </span>
           <span v-if="store.running.has(instance.id)" class="status running">● Em execução</span>
           <span v-else-if="!instance.installed" class="status pending">Aguardando download</span>
+          <span v-else class="playtime">🕑 {{ fmt(instance.playtime_seconds) }}</span>
         </div>
         <div class="actions" @click.stop>
           <button
@@ -109,6 +159,7 @@ const loaderLabel: Record<string, string> = {
           >
             ⬇
           </button>
+          <button class="dup" title="Duplicar instância" @click="duplicate(instance)">⧉</button>
         </div>
       </article>
     </div>
@@ -134,6 +185,55 @@ const loaderLabel: Record<string, string> = {
 .subtitle {
   color: var(--color-secondary);
   margin: 0.35rem 0 0;
+}
+
+.stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  background: var(--color-raised-bg);
+  border-radius: var(--radius-lg);
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat strong {
+  color: var(--color-contrast);
+  font-size: 18px;
+}
+
+.stat span {
+  font-size: 12px;
+  color: var(--color-secondary);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.sort {
+  font-size: 13px;
+  color: var(--color-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.playtime {
+  font-size: 12px;
+  color: var(--color-secondary);
+}
+
+.dup {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  font-size: 15px;
 }
 
 .grid {

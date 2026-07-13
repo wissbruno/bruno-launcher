@@ -60,6 +60,8 @@ export const useLauncherStore = defineStore('launcher', {
         const lines = this.logs.get(e.id) ?? [];
         lines.push(`--- Jogo encerrado (código ${e.code}) ---`);
         this.logs.set(e.id, lines);
+        // Recarrega para refletir o playtime recém-somado no backend
+        this.refreshInstances();
       });
 
       await Promise.all([this.refreshInstances(), this.refreshAccounts(), this.loadSettings()]);

@@ -4,6 +4,7 @@ import BrowsePage from './pages/BrowsePage.vue';
 import ProjectPage from './pages/ProjectPage.vue';
 import LibraryPage from './pages/LibraryPage.vue';
 import InstancePage from './pages/InstancePage.vue';
+import SkinsPage from './pages/SkinsPage.vue';
 import SettingsPage from './pages/SettingsPage.vue';
 
 export const router = createRouter({
@@ -14,6 +15,7 @@ export const router = createRouter({
     { path: '/project/:id', name: 'project', component: ProjectPage },
     { path: '/library', name: 'library', component: LibraryPage },
     { path: '/instance/:id', name: 'instance', component: InstancePage },
+    { path: '/skins', name: 'skins', component: SkinsPage },
     { path: '/settings', name: 'settings', component: SettingsPage },
   ],
 });

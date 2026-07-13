@@ -11,6 +11,7 @@ import {
   openInstanceFolder,
   listInstanceContent,
   removeInstanceContent,
+  formatPlaytime,
   type ContentFile,
 } from '../api/backend';
 import InstanceIcon from '../components/InstanceIcon.vue';
@@ -125,6 +126,7 @@ function formatSize(bytes: number): string {
           {{ instance.loader }} · Minecraft {{ instance.game_version }}
           <template v-if="instance.loader_version"> · loader {{ instance.loader_version }}</template>
         </span>
+        <span class="meta">🕑 {{ formatPlaytime(instance.playtime_seconds) }} de jogatina</span>
         <span v-if="isRunning" class="status running">● Em execução</span>
         <span v-else-if="!instance.installed" class="status pending">Jogo ainda não baixado</span>
       </div>

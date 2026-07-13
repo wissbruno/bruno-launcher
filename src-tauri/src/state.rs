@@ -1,11 +1,19 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Instant;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Runtime};
 
 use crate::error::Result;
+
+/// Um jogo em execução: pid do processo e quando começou (para medir playtime).
+#[derive(Clone, Copy)]
+pub struct RunningGame {
+    pub pid: u32,
+    pub started: Instant,
+}
 
 /// Estado global do launcher: diretórios de dados e cliente HTTP.
 /// Layout em disco (compartilhado entre instâncias, como no Modrinth App):
@@ -18,8 +26,8 @@ use crate::error::Result;
 pub struct Launcher {
     pub root: PathBuf,
     pub http: reqwest::Client,
-    /// PIDs dos jogos em execução, por id de instância.
-    pub running: Mutex<HashMap<String, u32>>,
+    /// Jogos em execução, por id de instância.
+    pub running: Mutex<HashMap<String, RunningGame>>,
 }
 
 impl Launcher {

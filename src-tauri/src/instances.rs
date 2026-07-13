@@ -23,6 +23,9 @@ pub struct Instance {
     /// true depois que jogo/bibliotecas/assets foram baixados com sucesso
     #[serde(default)]
     pub installed: bool,
+    /// tempo total de jogatina acumulado, em segundos
+    #[serde(default)]
+    pub playtime_seconds: u64,
 }
 
 pub fn instance_dir(launcher: &Launcher, id: &str) -> PathBuf {
@@ -100,9 +103,19 @@ pub fn new_instance(
         icon_url,
         modpack,
         installed: false,
+        playtime_seconds: 0,
     };
     save_instance(launcher, &instance)?;
     Ok(instance)
+}
+
+/// Soma segundos de jogatina a uma instância (chamado quando o jogo encerra).
+pub fn add_playtime(launcher: &Launcher, id: &str, seconds: u64) -> Result<()> {
+    if let Ok(mut instance) = load_instance(launcher, id) {
+        instance.playtime_seconds += seconds;
+        save_instance(launcher, &instance)?;
+    }
+    Ok(())
 }
 
 // ------------------------- Comandos Tauri -------------------------
@@ -163,6 +176,48 @@ pub fn rename_instance(launcher: State<'_, Launcher>, id: String, name: String) 
     instance.name = name;
     save_instance(&launcher, &instance)?;
     Ok(instance)
+}
+
+/// Duplica uma instância (copia mods, saves, configs — tudo menos o
+/// instance.json, que é recriado com novo id e playtime zerado).
+#[tauri::command]
+pub fn duplicate_instance(launcher: State<'_, Launcher>, id: String) -> Result<Instance> {
+    let original = load_instance(&launcher, &id)?;
+    let copy = new_instance(
+        &launcher,
+        &format!("{} (cópia)", original.name),
+        &original.game_version,
+        &original.loader,
+        original.loader_version.clone(),
+        original.icon_url.clone(),
+        original.modpack.clone(),
+    )?;
+
+    // Copia o conteúdo da pasta (mods, saves, resourcepacks...), exceto o json
+    let src = instance_dir(&launcher, &id);
+    let dst = instance_dir(&launcher, &copy.id);
+    copy_dir_except(&src, &dst, "instance.json")?;
+
+    Ok(copy)
+}
+
+fn copy_dir_except(src: &std::path::Path, dst: &std::path::Path, skip: &str) -> Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if name.to_string_lossy() == skip {
+            continue;
+        }
+        let from = entry.path();
+        let to = dst.join(&name);
+        if from.is_dir() {
+            copy_dir_except(&from, &to, "")?;
+        } else {
+            fs::copy(&from, &to)?;
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]

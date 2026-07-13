@@ -18,6 +18,7 @@ export interface Instance {
   icon_url: string | null;
   modpack: string | null;
   installed: boolean;
+  playtime_seconds: number;
 }
 
 export interface ContentFile {
@@ -70,6 +71,17 @@ export interface GameLogEvent {
 export interface GameExitEvent {
   id: string;
   code: number;
+  session_seconds: number;
+}
+
+/** Formata segundos como "3h 12min", "45min" ou "Nunca jogado". */
+export function formatPlaytime(seconds: number): string {
+  if (!seconds) return 'Nunca jogado';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return m > 0 ? `${h}h ${m}min` : `${h}h`;
+  if (m > 0) return `${m}min`;
+  return 'menos de 1min';
 }
 
 function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -87,6 +99,7 @@ export const createInstance = (name: string, gameVersion: string, loader: string
   call<Instance>('create_instance', { name, gameVersion, loader, loaderVersion });
 export const deleteInstance = (id: string) => call<void>('delete_instance', { id });
 export const renameInstance = (id: string, name: string) => call<Instance>('rename_instance', { id, name });
+export const duplicateInstance = (id: string) => call<Instance>('duplicate_instance', { id });
 export const openInstanceFolder = (id: string) => call<void>('open_instance_folder', { id });
 export const listInstanceContent = (id: string) => call<ContentFile[]>('list_instance_content', { id });
 export const removeInstanceContent = (id: string, folder: string, filename: string) =>
@@ -128,6 +141,22 @@ export interface SkinInfo {
 export const getSkin = () => call<SkinInfo>('get_skin');
 export const uploadSkin = (pngBase64: string, variant: 'classic' | 'slim') =>
   call<void>('upload_skin', { pngBase64, variant });
+
+// Galeria de skins
+export interface SavedSkin {
+  id: string;
+  name: string;
+  variant: 'classic' | 'slim';
+  added: string;
+  png_base64: string;
+  favorite: boolean;
+}
+export const listSavedSkins = () => call<SavedSkin[]>('list_saved_skins');
+export const addSavedSkin = (name: string, variant: 'classic' | 'slim', pngBase64: string) =>
+  call<SavedSkin>('add_saved_skin', { name, variant, pngBase64 });
+export const deleteSavedSkin = (id: string) => call<void>('delete_saved_skin', { id });
+export const setFavoriteSkin = (id: string) => call<void>('set_favorite_skin', { id });
+export const applySavedSkin = (id: string) => call<void>('apply_saved_skin', { id });
 
 // Eventos
 export function onProgress(handler: (e: ProgressEvent) => void): Promise<UnlistenFn> {

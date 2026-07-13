@@ -133,6 +133,49 @@ async fn cria_instala_e_lanca_neoforge() {
     println!("[teste] SUCESSO: Minecraft + NeoForge rodou 40s sem crashar");
 }
 
+/// Confere que a jogatina é somada: lança o jogo, espera ~8s, mata, e
+/// verifica que playtime_seconds aumentou (>= 5s).
+#[tokio::test(flavor = "multi_thread")]
+async fn contabiliza_playtime() {
+    use tauri::Manager;
+    let mock = tauri::test::mock_app();
+    let app = mock.handle().clone();
+    // IMPORTANTE: usar a MESMA instância gerenciada tanto para lançar quanto
+    // para o callback de saída, senão o mapa de "jogos rodando" (em memória)
+    // não bate e o playtime não é somado.
+    app.manage(Launcher::new().expect("launcher"));
+    let launcher = app.state::<Launcher>();
+
+    let instance = test_instance(&launcher).await;
+    launch::install(&app, &launcher, &instance.id)
+        .await
+        .expect("instalar");
+
+    let before = instances::load_instance(&launcher, &instance.id)
+        .expect("carregar")
+        .playtime_seconds;
+
+    let pid = launch::launch(&app, &launcher, &instance.id, AuthSession::offline("TesteBot"))
+        .await
+        .expect("lançar");
+    tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+    let _ = std::process::Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/F", "/T"])
+        .output();
+    // Aguarda o callback de saída processar e salvar o playtime
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    let after = instances::load_instance(&launcher, &instance.id)
+        .expect("carregar 2")
+        .playtime_seconds;
+    println!("[teste] playtime {before}s -> {after}s");
+    assert!(
+        after >= before + 5,
+        "playtime não foi contabilizado: {before} -> {after}"
+    );
+    println!("[teste] SUCESSO: playtime somou {}s", after - before);
+}
+
 /// Instala o Mod Menu na instância de teste e confere que as dependências
 /// obrigatórias (Fabric API + Placeholder API) vieram junto.
 #[tokio::test(flavor = "multi_thread")]
