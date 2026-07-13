@@ -14,6 +14,7 @@ pub fn run() {
     let launcher = Launcher::new().expect("falha ao iniciar diretórios do launcher");
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(launcher)
         .invoke_handler(tauri::generate_handler![
             // Instâncias
@@ -26,6 +27,11 @@ pub fn run() {
             instances::get_instance_icon,
             instances::set_instance_pinned,
             instances::set_instance_details,
+            instances::set_instance_java,
+            instances::list_worlds,
+            instances::list_screenshots,
+            instances::get_screenshot,
+            instances::open_instance_subfolder,
             instances::open_instance_folder,
             instances::list_instance_content,
             instances::remove_instance_content,
@@ -39,6 +45,7 @@ pub fn run() {
             // Conteúdo Modrinth
             content::install_content,
             content::install_modpack,
+            content::install_local_mrpack,
             content::check_mod_updates,
             content::apply_mod_updates,
             content::export_modpack,

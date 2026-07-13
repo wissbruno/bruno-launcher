@@ -247,7 +247,13 @@ pub async fn launch<R: Runtime>(
         ("resolution_height", "720".to_string()),
     ]);
 
-    let mut jvm_args: Vec<String> = vec![format!("-Xmx{}M", s.memory_mb)];
+    // Memória: override da instância > configuração global
+    let memory = instance.memory_mb.unwrap_or(s.memory_mb);
+    let mut jvm_args: Vec<String> = vec![format!("-Xmx{memory}M")];
+    // Argumentos extras da JVM definidos pela instância
+    if let Some(extra) = &instance.java_args {
+        jvm_args.extend(extra.split_whitespace().map(String::from));
+    }
     let mut has_cp = false;
     if let Some(arguments) = &version.arguments {
         let expanded = expand_arguments(&arguments.jvm, &vars);

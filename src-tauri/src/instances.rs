@@ -38,6 +38,12 @@ pub struct Instance {
     /// cor de destaque (hex) escolhida para a instância
     #[serde(default)]
     pub accent_color: Option<String>,
+    /// memória máxima da JVM só para esta instância (MB); None = global
+    #[serde(default)]
+    pub memory_mb: Option<u32>,
+    /// argumentos extras da JVM só para esta instância
+    #[serde(default)]
+    pub java_args: Option<String>,
 }
 
 pub fn instance_dir(launcher: &Launcher, id: &str) -> PathBuf {
@@ -120,6 +126,8 @@ pub fn new_instance(
         pinned: false,
         notes: None,
         accent_color: None,
+        memory_mb: None,
+        java_args: None,
     };
     save_instance(launcher, &instance)?;
     Ok(instance)
@@ -300,6 +308,122 @@ pub fn set_instance_details(
     instance.accent_color = accent_color.filter(|c| !c.trim().is_empty());
     save_instance(&launcher, &instance)?;
     Ok(instance)
+}
+
+/// Configuração de Java específica da instância (memória e argumentos extras).
+#[tauri::command]
+pub fn set_instance_java(
+    launcher: State<'_, Launcher>,
+    id: String,
+    memory_mb: Option<u32>,
+    java_args: Option<String>,
+) -> Result<Instance> {
+    let mut instance = load_instance(&launcher, &id)?;
+    instance.memory_mb = memory_mb.filter(|m| *m >= 512);
+    instance.java_args = java_args.filter(|a| !a.trim().is_empty());
+    save_instance(&launcher, &instance)?;
+    Ok(instance)
+}
+
+// ------------------------- Mundos e capturas -------------------------
+
+#[derive(Serialize)]
+pub struct WorldInfo {
+    pub folder: String,
+    pub icon_base64: Option<String>,
+    pub last_modified: Option<String>,
+}
+
+/// Lista os mundos (saves/) da instância, com o ícone que o próprio jogo gera.
+#[tauri::command]
+pub fn list_worlds(launcher: State<'_, Launcher>, id: String) -> Result<Vec<WorldInfo>> {
+    use base64::Engine;
+    let dir = instance_dir(&launcher, &id).join("saves");
+    let mut out = Vec::new();
+    if dir.exists() {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if !path.is_dir() || !path.join("level.dat").exists() {
+                continue;
+            }
+            let icon = fs::read(path.join("icon.png"))
+                .ok()
+                .map(|b| base64::engine::general_purpose::STANDARD.encode(b));
+            let modified = entry
+                .metadata()
+                .and_then(|m| m.modified())
+                .ok()
+                .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
+            out.push(WorldInfo {
+                folder: entry.file_name().to_string_lossy().to_string(),
+                icon_base64: icon,
+                last_modified: modified,
+            });
+        }
+    }
+    out.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+    Ok(out)
+}
+
+#[derive(Serialize)]
+pub struct ScreenshotInfo {
+    pub filename: String,
+    pub modified: Option<String>,
+}
+
+/// Lista as capturas de tela da instância (mais recentes primeiro).
+#[tauri::command]
+pub fn list_screenshots(launcher: State<'_, Launcher>, id: String) -> Result<Vec<ScreenshotInfo>> {
+    let dir = instance_dir(&launcher, &id).join("screenshots");
+    let mut out = Vec::new();
+    if dir.exists() {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().map(|e| e == "png").unwrap_or(false) {
+                out.push(ScreenshotInfo {
+                    filename: entry.file_name().to_string_lossy().to_string(),
+                    modified: entry
+                        .metadata()
+                        .and_then(|m| m.modified())
+                        .ok()
+                        .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339()),
+                });
+            }
+        }
+    }
+    out.sort_by(|a, b| b.modified.cmp(&a.modified));
+    Ok(out)
+}
+
+/// Conteúdo (base64) de uma captura para exibir no launcher.
+#[tauri::command]
+pub fn get_screenshot(launcher: State<'_, Launcher>, id: String, filename: String) -> Result<String> {
+    use base64::Engine;
+    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
+        return Err(AppError::msg("Nome inválido"));
+    }
+    let path = instance_dir(&launcher, &id).join("screenshots").join(filename);
+    Ok(base64::engine::general_purpose::STANDARD.encode(fs::read(path)?))
+}
+
+/// Abre uma subpasta segura da instância no Explorer.
+#[tauri::command]
+pub fn open_instance_subfolder(
+    launcher: State<'_, Launcher>,
+    id: String,
+    folder: String,
+) -> Result<()> {
+    if !["screenshots", "saves", "mods", "resourcepacks", "shaderpacks", "config"]
+        .contains(&folder.as_str())
+    {
+        return Err(AppError::msg("Pasta inválida"));
+    }
+    let dir = instance_dir(&launcher, &id).join(folder);
+    fs::create_dir_all(&dir)?;
+    tauri_plugin_opener::open_path(dir.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| AppError::msg(e.to_string()))
 }
 
 #[tauri::command]

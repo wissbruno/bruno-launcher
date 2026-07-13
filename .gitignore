@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Ambiente Python criado por engano na pasta (nao e do launcher)
+Include/
+Lib/
+Scripts/
+pyvenv.cfg

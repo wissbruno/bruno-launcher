@@ -267,6 +267,41 @@ async fn exporta_mrpack() {
     println!("[teste] SUCESSO: mrpack com {} arquivo(s)", json["files"].as_array().unwrap().len());
 }
 
+/// Ida-e-volta de modpack: exporta a instância de teste como .mrpack e
+/// importa o arquivo local como uma instância nova.
+#[tokio::test(flavor = "multi_thread")]
+async fn roundtrip_mrpack_local() {
+    use tauri::Manager;
+    let mock = tauri::test::mock_app();
+    let app = mock.handle().clone();
+    app.manage(Launcher::new().expect("launcher"));
+    let launcher = app.state::<Launcher>();
+
+    let original = test_instance(&launcher).await;
+    let path = content::export_modpack(launcher.clone(), original.id.clone())
+        .await
+        .expect("exportar");
+
+    let imported = content::install_local_mrpack(app.clone(), launcher.clone(), path.clone())
+        .await
+        .expect("importar mrpack local");
+    println!(
+        "[teste] importado: {} ({} {})",
+        imported.name, imported.loader, imported.game_version
+    );
+    assert_eq!(imported.game_version, GAME);
+    assert_eq!(imported.loader, "fabric");
+    let mods = launcher
+        .instances_dir()
+        .join(&imported.id)
+        .join("mods");
+    assert!(mods.exists() && std::fs::read_dir(&mods).unwrap().count() > 0, "mods não importados");
+
+    // Limpa a instância importada para não acumular lixo
+    instances::delete_instance(launcher, imported.id.clone()).expect("limpar");
+    println!("[teste] SUCESSO: roundtrip export→import ok");
+}
+
 /// Importa a skin de um jogador conhecido (Notch) pela API oficial da Mojang
 /// e confere que virou uma skin na galeria.
 #[tokio::test(flavor = "multi_thread")]

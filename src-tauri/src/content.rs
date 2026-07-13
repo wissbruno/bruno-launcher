@@ -389,8 +389,49 @@ pub async fn install_modpack<R: Runtime>(
     let tmp = launcher.meta_dir().join(format!("{}.mrpack", version.id));
     download_file(&launcher, &file.url, &tmp, Some(&file.hashes.sha1)).await?;
 
-    // 2. Lê o índice
-    let mut zip = zip::ZipArchive::new(std::fs::File::open(&tmp)?)?;
+    let instance = install_mrpack_file(
+        &app,
+        &launcher,
+        &tmp,
+        &project.title,
+        project.icon_url.clone(),
+        Some(project.id.clone()),
+    )
+    .await?;
+    std::fs::remove_file(&tmp).ok();
+    Ok(instance)
+}
+
+/// Importa um arquivo .mrpack do computador do usuário (baixado de qualquer
+/// site) criando uma instância nova.
+#[tauri::command]
+pub async fn install_local_mrpack<R: Runtime>(
+    app: AppHandle<R>,
+    launcher: State<'_, Launcher>,
+    path: String,
+) -> Result<Instance> {
+    let file = std::path::PathBuf::from(&path);
+    if !file.is_file() {
+        return Err(AppError::msg("Arquivo não encontrado"));
+    }
+    let fallback = file
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "Modpack importado".into());
+    install_mrpack_file(&app, &launcher, &file, &fallback, None, None).await
+}
+
+/// Processa um arquivo .mrpack (índice + overrides), criando a instância.
+async fn install_mrpack_file<R: Runtime>(
+    app: &AppHandle<R>,
+    launcher: &Launcher,
+    mrpack: &Path,
+    fallback_name: &str,
+    icon_url: Option<String>,
+    modpack_id: Option<String>,
+) -> Result<Instance> {
+    // Lê o índice
+    let mut zip = zip::ZipArchive::new(std::fs::File::open(mrpack)?)?;
     let index: MrpackIndex = {
         let mut entry = zip.by_name("modrinth.index.json")?;
         let mut text = String::new();
@@ -415,18 +456,18 @@ pub async fn install_modpack<R: Runtime>(
         ("vanilla", None)
     };
 
-    // 3. Cria a instância
-    let display_name = index.name.clone().unwrap_or_else(|| project.title.clone());
+    // Cria a instância
+    let display_name = index.name.clone().unwrap_or_else(|| fallback_name.to_string());
     let instance = new_instance(
-        &launcher,
+        launcher,
         &display_name,
         &game_version,
         loader,
         loader_version,
-        project.icon_url.clone(),
-        Some(project.id.clone()),
+        icon_url,
+        modpack_id,
     )?;
-    let game_dir = instance_dir(&launcher, &instance.id);
+    let game_dir = instance_dir(launcher, &instance.id);
 
     // 4. Baixa os arquivos do índice
     let files: Vec<&MrpackFile> = index
@@ -441,13 +482,13 @@ pub async fn install_modpack<R: Runtime>(
         })
         .collect();
     let total = files.len() as u64;
-    emit_progress(&app, &instance.id, "Baixando arquivos do modpack...", 0, total, false);
+    emit_progress(app, &instance.id, "Baixando arquivos do modpack...", 0, total, false);
 
     for f in &files {
         safe_relative_path(&f.path)?;
     }
     let mut done = 0u64;
-    let launcher_ref: &Launcher = &launcher;
+    let launcher_ref: &Launcher = launcher;
     let futs: Vec<_> = files
         .iter()
         .map(|f| {
@@ -468,12 +509,12 @@ pub async fn install_modpack<R: Runtime>(
         r?;
         done += 1;
         if done % 5 == 0 || done == total {
-            emit_progress(&app, &instance.id, "Baixando arquivos do modpack...", done, total, false);
+            emit_progress(app, &instance.id, "Baixando arquivos do modpack...", done, total, false);
         }
     }
 
-    // 5. Extrai overrides/ e client-overrides/
-    emit_progress(&app, &instance.id, "Aplicando overrides...", 0, 1, false);
+    // Extrai overrides/ e client-overrides/
+    emit_progress(app, &instance.id, "Aplicando overrides...", 0, 1, false);
     for prefix in ["overrides/", "client-overrides/"] {
         for i in 0..zip.len() {
             let mut entry = zip.by_index(i)?;
@@ -495,8 +536,7 @@ pub async fn install_modpack<R: Runtime>(
         }
     }
 
-    std::fs::remove_file(&tmp).ok();
-    emit_progress(&app, &instance.id, "Modpack pronto — preparando o jogo...", 1, 1, true);
+    emit_progress(app, &instance.id, "Modpack pronto — preparando o jogo...", 1, 1, true);
     Ok(instance)
 }
 

@@ -23,6 +23,19 @@ export interface Instance {
   pinned: boolean;
   notes: string | null;
   accent_color: string | null;
+  memory_mb: number | null;
+  java_args: string | null;
+}
+
+export interface WorldInfo {
+  folder: string;
+  icon_base64: string | null;
+  last_modified: string | null;
+}
+
+export interface ScreenshotInfo {
+  filename: string;
+  modified: string | null;
 }
 
 export interface ContentFile {
@@ -78,6 +91,12 @@ export interface GameExitEvent {
   session_seconds: number;
 }
 
+/** Data ISO → "12 de jul." (ou vazio). */
+export function formatDateShort(iso: string | null): string {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 /** Formata segundos como "3h 12min", "45min" ou "Nunca jogado". */
 export function formatPlaytime(seconds: number): string {
   if (!seconds) return 'Nunca jogado';
@@ -111,6 +130,14 @@ export const setInstancePinned = (id: string, pinned: boolean) =>
   call<Instance>('set_instance_pinned', { id, pinned });
 export const setInstanceDetails = (id: string, notes: string | null, accentColor: string | null) =>
   call<Instance>('set_instance_details', { id, notes, accentColor });
+export const setInstanceJava = (id: string, memoryMb: number | null, javaArgs: string | null) =>
+  call<Instance>('set_instance_java', { id, memoryMb, javaArgs });
+export const listWorlds = (id: string) => call<WorldInfo[]>('list_worlds', { id });
+export const listScreenshots = (id: string) => call<ScreenshotInfo[]>('list_screenshots', { id });
+export const getScreenshot = (id: string, filename: string) =>
+  call<string>('get_screenshot', { id, filename });
+export const openInstanceSubfolder = (id: string, folder: string) =>
+  call<void>('open_instance_subfolder', { id, folder });
 export const openInstanceFolder = (id: string) => call<void>('open_instance_folder', { id });
 export const listInstanceContent = (id: string) => call<ContentFile[]>('list_instance_content', { id });
 export const removeInstanceContent = (id: string, folder: string, filename: string) =>
@@ -131,6 +158,8 @@ export const installContent = (instanceId: string, projectId: string, versionId?
   call<string[]>('install_content', { instanceId, projectId, versionId });
 export const installModpack = (projectId: string, versionId?: string) =>
   call<Instance>('install_modpack', { projectId, versionId });
+export const installLocalMrpack = (path: string) =>
+  call<Instance>('install_local_mrpack', { path });
 
 // Atualização de mods e export
 export interface ModUpdate {

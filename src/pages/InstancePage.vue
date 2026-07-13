@@ -14,12 +14,20 @@ import {
   setInstanceIcon,
   setInstancePinned,
   setInstanceDetails,
+  setInstanceJava,
   checkModUpdates,
   applyModUpdates,
   exportModpack,
+  listWorlds,
+  listScreenshots,
+  getScreenshot,
+  openInstanceSubfolder,
   formatPlaytime,
+  formatDateShort,
   type ContentFile,
   type ModUpdate,
+  type WorldInfo,
+  type ScreenshotInfo,
 } from '../api/backend';
 import InstanceIcon from '../components/InstanceIcon.vue';
 
@@ -32,7 +40,7 @@ const instance = computed(() => store.instances.find((i) => i.id === id.value) ?
 const isRunning = computed(() => store.running.has(id.value));
 const logs = computed(() => store.logs.get(id.value) ?? []);
 
-const tab = ref<'content' | 'logs'>('content');
+const tab = ref<'content' | 'worlds' | 'shots' | 'config' | 'logs'>('content');
 const content = ref<ContentFile[]>([]);
 const error = ref('');
 const renaming = ref(false);
@@ -190,6 +198,55 @@ async function saveDetails() {
   editingDetails.value = false;
 }
 
+// --- Mundos e capturas ---
+const worlds = ref<WorldInfo[]>([]);
+const shots = ref<ScreenshotInfo[]>([]);
+const shotImages = ref(new Map<string, string>());
+
+async function loadWorlds() {
+  tab.value = 'worlds';
+  try {
+    worlds.value = await listWorlds(id.value);
+  } catch (e) {
+    error.value = String(e);
+  }
+}
+
+async function loadShots() {
+  tab.value = 'shots';
+  try {
+    shots.value = await listScreenshots(id.value);
+    // Carrega as 12 mais recentes
+    for (const s of shots.value.slice(0, 12)) {
+      if (!shotImages.value.has(s.filename)) {
+        getScreenshot(id.value, s.filename)
+          .then((b64) => shotImages.value.set(s.filename, b64))
+          .catch(() => {});
+      }
+    }
+  } catch (e) {
+    error.value = String(e);
+  }
+}
+
+// --- Configuração de Java por instância ---
+const javaMemory = ref<number | null>(null);
+const javaArgs = ref('');
+const javaSaved = ref(false);
+
+function openConfig() {
+  tab.value = 'config';
+  javaMemory.value = instance.value?.memory_mb ?? null;
+  javaArgs.value = instance.value?.java_args ?? '';
+}
+
+async function saveJava() {
+  await setInstanceJava(id.value, javaMemory.value || null, javaArgs.value || null);
+  await store.refreshInstances();
+  javaSaved.value = true;
+  setTimeout(() => (javaSaved.value = false), 2000);
+}
+
 // --- Exportar modpack ---
 const exporting = ref(false);
 
@@ -298,6 +355,9 @@ function formatSize(bytes: number): string {
       <button :class="{ active: tab === 'content' }" @click="tab = 'content'; refreshContent()">
         Conteúdo
       </button>
+      <button :class="{ active: tab === 'worlds' }" @click="loadWorlds">Mundos</button>
+      <button :class="{ active: tab === 'shots' }" @click="loadShots">Capturas</button>
+      <button :class="{ active: tab === 'config' }" @click="openConfig">Configuração</button>
       <button :class="{ active: tab === 'logs' }" @click="tab = 'logs'">Logs do jogo</button>
     </nav>
 
@@ -341,6 +401,77 @@ function formatSize(bytes: number): string {
       <p v-else class="empty">
         Nenhum conteúdo instalado ainda — use "Adicionar conteúdo" para buscar mods compatíveis.
       </p>
+    </section>
+
+    <section v-else-if="tab === 'worlds'">
+      <div class="content-header">
+        <button @click="openInstanceSubfolder(id, 'saves')">📁 Abrir pasta de mundos</button>
+      </div>
+      <div v-if="worlds.length" class="worlds-grid">
+        <article v-for="w in worlds" :key="w.folder" class="card world-card">
+          <img
+            v-if="w.icon_base64"
+            :src="`data:image/png;base64,${w.icon_base64}`"
+            class="world-icon"
+            alt=""
+          />
+          <div v-else class="world-icon placeholder">🌍</div>
+          <div class="world-info">
+            <strong>{{ w.folder }}</strong>
+            <span v-if="w.last_modified" class="date">
+              Jogado em {{ formatDateShort(w.last_modified) }}
+            </span>
+          </div>
+        </article>
+      </div>
+      <p v-else class="empty">Nenhum mundo ainda — os saves aparecem aqui depois de jogar.</p>
+    </section>
+
+    <section v-else-if="tab === 'shots'">
+      <div class="content-header">
+        <button @click="openInstanceSubfolder(id, 'screenshots')">📁 Abrir pasta de capturas</button>
+      </div>
+      <div v-if="shots.length" class="shots-grid">
+        <figure v-for="s in shots.slice(0, 12)" :key="s.filename" class="card shot">
+          <img
+            v-if="shotImages.get(s.filename)"
+            :src="`data:image/png;base64,${shotImages.get(s.filename)}`"
+            :alt="s.filename"
+            loading="lazy"
+          />
+          <div v-else class="shot-loading">Carregando...</div>
+          <figcaption>{{ s.filename }}</figcaption>
+        </figure>
+      </div>
+      <p v-else class="empty">
+        Nenhuma captura — aperte F2 dentro do jogo e elas aparecem aqui.
+      </p>
+    </section>
+
+    <section v-else-if="tab === 'config'" class="card config">
+      <h3>Java desta instância</h3>
+      <label class="field">
+        Memória máxima (MB) — vazio usa o padrão global
+        <input
+          v-model.number="javaMemory"
+          type="number"
+          min="512"
+          step="512"
+          placeholder="padrão global"
+          style="max-width: 200px"
+        />
+      </label>
+      <label class="field">
+        Argumentos extras da JVM
+        <input
+          v-model="javaArgs"
+          placeholder="-XX:+UseG1GC ..."
+          style="max-width: 420px"
+        />
+      </label>
+      <button class="btn-brand" style="align-self: flex-start" @click="saveJava">
+        {{ javaSaved ? 'Salvo ✓' : 'Salvar' }}
+      </button>
     </section>
 
     <section v-else ref="logsEl" class="card logs">
@@ -477,6 +608,101 @@ function formatSize(bytes: number): string {
 .ok {
   color: var(--color-brand);
   word-break: break-all;
+}
+
+.worlds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.75rem;
+}
+
+.world-card {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem;
+}
+
+.world-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.world-icon.placeholder {
+  display: grid;
+  place-items: center;
+  background: var(--color-button-bg);
+  font-size: 24px;
+}
+
+.world-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.world-info strong {
+  color: var(--color-contrast);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.world-info .date {
+  font-size: 12px;
+  color: var(--color-secondary);
+}
+
+.shots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+.shot {
+  margin: 0;
+  padding: 0.5rem;
+}
+
+.shot img {
+  width: 100%;
+  border-radius: var(--radius-md);
+}
+
+.shot-loading {
+  height: 150px;
+  display: grid;
+  place-items: center;
+  color: var(--color-secondary);
+  font-size: 13px;
+}
+
+.shot figcaption {
+  padding: 0.4rem 0.25rem 0;
+  font-size: 12px;
+  color: var(--color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-width: 560px;
+}
+
+.config .field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 13px;
+  color: var(--color-secondary);
 }
 
 .head-info {

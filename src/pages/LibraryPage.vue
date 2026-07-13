@@ -2,11 +2,13 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useLauncherStore } from '../stores/launcher';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import {
   launchInstance,
   killInstance,
   prepareInstance,
   duplicateInstance,
+  installLocalMrpack,
   formatPlaytime,
 } from '../api/backend';
 import CreateInstanceModal from '../components/CreateInstanceModal.vue';
@@ -18,9 +20,13 @@ const router = useRouter();
 const showCreate = ref(false);
 const error = ref('');
 const sortBy = ref<'recent' | 'played' | 'name'>('recent');
+const search = ref('');
+const importing = ref(false);
 
 const sortedInstances = computed(() => {
-  const list = [...store.instances];
+  let list = [...store.instances];
+  const q = search.value.trim().toLowerCase();
+  if (q) list = list.filter((i) => i.name.toLowerCase().includes(q));
   if (sortBy.value === 'played') list.sort((a, b) => b.playtime_seconds - a.playtime_seconds);
   else if (sortBy.value === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
   // 'recent' já vem ordenado por criação do backend
@@ -69,6 +75,28 @@ async function duplicate(instance: Instance) {
   }
 }
 
+async function importMrpack() {
+  error.value = '';
+  try {
+    const path = await openDialog({
+      title: 'Escolha um arquivo .mrpack',
+      filters: [{ name: 'Modpack do Modrinth', extensions: ['mrpack'] }],
+      multiple: false,
+    });
+    if (typeof path !== 'string') return;
+    importing.value = true;
+    const instance = await installLocalMrpack(path);
+    await store.refreshInstances();
+    // Baixa jogo/loader em segundo plano
+    prepareInstance(instance.id).catch(() => {});
+    router.push(`/instance/${instance.id}`);
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    importing.value = false;
+  }
+}
+
 const fmt = formatPlaytime;
 
 const loaderLabel: Record<string, string> = {
@@ -87,9 +115,14 @@ const loaderLabel: Record<string, string> = {
         <h1>Biblioteca</h1>
         <p class="subtitle">Suas instalações do Minecraft.</p>
       </div>
-      <button class="btn-brand" :disabled="!store.isTauri" @click="showCreate = true">
-        + Nova instância
-      </button>
+      <div class="header-actions">
+        <button :disabled="!store.isTauri || importing" @click="importMrpack">
+          {{ importing ? 'Importando...' : '📦 Importar .mrpack' }}
+        </button>
+        <button class="btn-brand" :disabled="!store.isTauri" @click="showCreate = true">
+          + Nova instância
+        </button>
+      </div>
     </div>
 
     <p v-if="!store.isTauri" class="warn card">
@@ -107,6 +140,7 @@ const loaderLabel: Record<string, string> = {
         <span>de jogatina total</span>
       </div>
       <div class="spacer"></div>
+      <input v-model="search" class="search" placeholder="Buscar instância..." />
       <label class="sort">
         Ordenar:
         <select v-model="sortBy">
@@ -219,6 +253,15 @@ const loaderLabel: Record<string, string> = {
 
 .spacer {
   flex: 1;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.search {
+  max-width: 220px;
 }
 
 .sort {
