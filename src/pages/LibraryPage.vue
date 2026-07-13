@@ -21,9 +21,11 @@ const sortBy = ref<'recent' | 'played' | 'name'>('recent');
 
 const sortedInstances = computed(() => {
   const list = [...store.instances];
-  if (sortBy.value === 'played') return list.sort((a, b) => b.playtime_seconds - a.playtime_seconds);
-  if (sortBy.value === 'name') return list.sort((a, b) => a.name.localeCompare(b.name));
-  return list; // 'recent' já vem ordenado por criação do backend
+  if (sortBy.value === 'played') list.sort((a, b) => b.playtime_seconds - a.playtime_seconds);
+  else if (sortBy.value === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
+  // 'recent' já vem ordenado por criação do backend
+  // Fixadas sempre no topo, preservando a ordem escolhida
+  return list.sort((a, b) => Number(b.pinned) - Number(a.pinned));
 });
 
 const totalPlaytime = computed(() =>
@@ -126,7 +128,10 @@ const loaderLabel: Record<string, string> = {
       >
         <InstanceIcon :instance="instance" :size="64" />
         <div class="info">
-          <h3>{{ instance.name }}</h3>
+          <h3>
+            <span v-if="instance.pinned" class="pin-badge" title="Fixada">★</span>
+            {{ instance.name }}
+          </h3>
           <span class="meta">
             {{ loaderLabel[instance.loader] ?? instance.loader }} {{ instance.game_version }}
           </span>
@@ -227,6 +232,11 @@ const loaderLabel: Record<string, string> = {
 .playtime {
   font-size: 12px;
   color: var(--color-secondary);
+}
+
+.pin-badge {
+  color: var(--color-orange);
+  font-size: 12px;
 }
 
 .dup {

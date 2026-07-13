@@ -26,6 +26,12 @@ pub struct Instance {
     /// tempo total de jogatina acumulado, em segundos
     #[serde(default)]
     pub playtime_seconds: u64,
+    /// true quando há um ícone personalizado salvo em <instance>/icon.png
+    #[serde(default)]
+    pub custom_icon: bool,
+    /// instâncias fixadas aparecem no topo da biblioteca
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 pub fn instance_dir(launcher: &Launcher, id: &str) -> PathBuf {
@@ -104,6 +110,8 @@ pub fn new_instance(
         modpack,
         installed: false,
         playtime_seconds: 0,
+        custom_icon: false,
+        pinned: false,
     };
     save_instance(launcher, &instance)?;
     Ok(instance)
@@ -218,6 +226,57 @@ fn copy_dir_except(src: &std::path::Path, dst: &std::path::Path, skip: &str) -> 
         }
     }
     Ok(())
+}
+
+/// Define (ou remove) o ícone personalizado da instância. `png_base64` vazio
+/// remove o ícone.
+#[tauri::command]
+pub fn set_instance_icon(
+    launcher: State<'_, Launcher>,
+    id: String,
+    png_base64: String,
+) -> Result<Instance> {
+    use base64::Engine;
+    let mut instance = load_instance(&launcher, &id)?;
+    let icon = instance_dir(&launcher, &id).join("icon.png");
+    if png_base64.trim().is_empty() {
+        std::fs::remove_file(&icon).ok();
+        instance.custom_icon = false;
+    } else {
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(png_base64.trim())
+            .map_err(|_| AppError::msg("Imagem inválida (base64)"))?;
+        if bytes.len() > 1024 * 1024 {
+            return Err(AppError::msg("Imagem muito grande (máx. 1 MB)"));
+        }
+        std::fs::write(&icon, &bytes)?;
+        instance.custom_icon = true;
+    }
+    save_instance(&launcher, &instance)?;
+    Ok(instance)
+}
+
+/// Retorna o ícone personalizado em base64 (para o frontend exibir).
+#[tauri::command]
+pub fn get_instance_icon(launcher: State<'_, Launcher>, id: String) -> Result<String> {
+    use base64::Engine;
+    let icon = instance_dir(&launcher, &id).join("icon.png");
+    let bytes = std::fs::read(&icon)
+        .map_err(|_| AppError::msg("Sem ícone personalizado"))?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
+}
+
+/// Fixa/desafixa a instância (aparece no topo da biblioteca).
+#[tauri::command]
+pub fn set_instance_pinned(
+    launcher: State<'_, Launcher>,
+    id: String,
+    pinned: bool,
+) -> Result<Instance> {
+    let mut instance = load_instance(&launcher, &id)?;
+    instance.pinned = pinned;
+    save_instance(&launcher, &instance)?;
+    Ok(instance)
 }
 
 #[tauri::command]

@@ -19,6 +19,8 @@ export interface Instance {
   modpack: string | null;
   installed: boolean;
   playtime_seconds: number;
+  custom_icon: boolean;
+  pinned: boolean;
 }
 
 export interface ContentFile {
@@ -100,6 +102,11 @@ export const createInstance = (name: string, gameVersion: string, loader: string
 export const deleteInstance = (id: string) => call<void>('delete_instance', { id });
 export const renameInstance = (id: string, name: string) => call<Instance>('rename_instance', { id, name });
 export const duplicateInstance = (id: string) => call<Instance>('duplicate_instance', { id });
+export const setInstanceIcon = (id: string, pngBase64: string) =>
+  call<Instance>('set_instance_icon', { id, pngBase64 });
+export const getInstanceIcon = (id: string) => call<string>('get_instance_icon', { id });
+export const setInstancePinned = (id: string, pinned: boolean) =>
+  call<Instance>('set_instance_pinned', { id, pinned });
 export const openInstanceFolder = (id: string) => call<void>('open_instance_folder', { id });
 export const listInstanceContent = (id: string) => call<ContentFile[]>('list_instance_content', { id });
 export const removeInstanceContent = (id: string, folder: string, filename: string) =>
@@ -154,6 +161,10 @@ export interface SavedSkin {
 export const listSavedSkins = () => call<SavedSkin[]>('list_saved_skins');
 export const addSavedSkin = (name: string, variant: 'classic' | 'slim', pngBase64: string) =>
   call<SavedSkin>('add_saved_skin', { name, variant, pngBase64 });
+export const importSkinFromPlayer = (username: string) =>
+  call<SavedSkin>('import_skin_from_player', { username });
+export const importSkinFromUrl = (name: string, variant: 'classic' | 'slim', url: string) =>
+  call<SavedSkin>('import_skin_from_url', { name, variant, url });
 export const deleteSavedSkin = (id: string) => call<void>('delete_saved_skin', { id });
 export const setFavoriteSkin = (id: string) => call<void>('set_favorite_skin', { id });
 export const applySavedSkin = (id: string) => call<void>('apply_saved_skin', { id });

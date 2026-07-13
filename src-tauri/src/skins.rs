@@ -78,20 +78,17 @@ fn is_png(bytes: &[u8]) -> bool {
     bytes.len() > 8 && bytes[..8] == [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]
 }
 
-#[tauri::command]
-pub fn add_saved_skin(
-    launcher: State<'_, Launcher>,
-    name: String,
-    variant: String,
-    png_base64: String,
+/// Salva bytes de PNG já obtidos como uma skin na galeria.
+fn store_skin_bytes(
+    launcher: &Launcher,
+    name: &str,
+    variant: &str,
+    bytes: &[u8],
 ) -> Result<SavedSkin> {
     if variant != "classic" && variant != "slim" {
         return Err(AppError::msg("Variante deve ser 'classic' ou 'slim'"));
     }
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(png_base64.trim())
-        .map_err(|_| AppError::msg("PNG inválido (base64)"))?;
-    if !is_png(&bytes) {
+    if !is_png(bytes) {
         return Err(AppError::msg("O arquivo não é um PNG válido"));
     }
     if bytes.len() > 512 * 1024 {
@@ -99,22 +96,134 @@ pub fn add_saved_skin(
     }
 
     let id = format!("skin-{}", chrono::Utc::now().timestamp_millis());
-    std::fs::create_dir_all(skins_dir(&launcher))?;
-    std::fs::write(png_path(&launcher, &id), &bytes)?;
+    std::fs::create_dir_all(skins_dir(launcher))?;
+    std::fs::write(png_path(launcher, &id), bytes)?;
 
     let skin = SavedSkin {
         id: id.clone(),
-        name: if name.trim().is_empty() { "Skin".into() } else { name },
-        variant,
+        name: if name.trim().is_empty() { "Skin".into() } else { name.to_string() },
+        variant: variant.to_string(),
         added: chrono::Utc::now().to_rfc3339(),
     };
-    let mut lib = load_library(&launcher);
+    let mut lib = load_library(launcher);
     lib.skins.insert(0, skin.clone());
     if lib.favorite.is_none() {
         lib.favorite = Some(id);
     }
-    save_library(&launcher, &lib)?;
+    save_library(launcher, &lib)?;
     Ok(skin)
+}
+
+#[tauri::command]
+pub fn add_saved_skin(
+    launcher: State<'_, Launcher>,
+    name: String,
+    variant: String,
+    png_base64: String,
+) -> Result<SavedSkin> {
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(png_base64.trim())
+        .map_err(|_| AppError::msg("PNG inválido (base64)"))?;
+    store_skin_bytes(&launcher, &name, &variant, &bytes)
+}
+
+/// Importa a skin de qualquer jogador do Minecraft pelo nick, usando a API
+/// oficial da Mojang (perfil → textura → PNG). Detecta o modelo (slim/classic).
+#[tauri::command]
+pub async fn import_skin_from_player(
+    launcher: State<'_, Launcher>,
+    username: String,
+) -> Result<SavedSkin> {
+    let username = username.trim();
+    if username.is_empty() {
+        return Err(AppError::msg("Digite um nome de jogador"));
+    }
+
+    // 1. nick → UUID
+    let profile: serde_json::Value = {
+        let res = launcher
+            .http
+            .get(format!(
+                "https://api.mojang.com/users/profiles/minecraft/{username}"
+            ))
+            .send()
+            .await?;
+        if res.status().as_u16() == 404 || res.status().as_u16() == 204 {
+            return Err(AppError::msg(format!("Jogador '{username}' não encontrado")));
+        }
+        res.error_for_status()?.json().await?
+    };
+    let uuid = profile["id"]
+        .as_str()
+        .ok_or_else(|| AppError::msg("Perfil sem UUID"))?;
+    let real_name = profile["name"].as_str().unwrap_or(username).to_string();
+
+    // 2. UUID → propriedades (textures em base64)
+    let session: serde_json::Value = launcher
+        .http
+        .get(format!(
+            "https://sessionserver.mojang.com/session/minecraft/profile/{uuid}"
+        ))
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    let textures_b64 = session["properties"]
+        .as_array()
+        .and_then(|props| props.iter().find(|p| p["name"] == "textures"))
+        .and_then(|p| p["value"].as_str())
+        .ok_or_else(|| AppError::msg("Perfil sem texturas"))?;
+    let textures: serde_json::Value = serde_json::from_slice(
+        &base64::engine::general_purpose::STANDARD
+            .decode(textures_b64)
+            .map_err(|_| AppError::msg("Texturas inválidas"))?,
+    )?;
+    let skin_node = &textures["textures"]["SKIN"];
+    let skin_url = skin_node["url"]
+        .as_str()
+        .ok_or_else(|| AppError::msg(format!("'{real_name}' não tem skin personalizada")))?;
+    let variant = if skin_node["metadata"]["model"] == "slim" {
+        "slim"
+    } else {
+        "classic"
+    };
+
+    // 3. baixa o PNG da skin
+    let bytes = launcher
+        .http
+        .get(skin_url)
+        .send()
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?;
+    store_skin_bytes(&launcher, &real_name, variant, &bytes)
+}
+
+/// Importa uma skin a partir da URL de um PNG (ex.: link de imagem de um site
+/// de skins). O usuário informa o modelo.
+#[tauri::command]
+pub async fn import_skin_from_url(
+    launcher: State<'_, Launcher>,
+    name: String,
+    variant: String,
+    url: String,
+) -> Result<SavedSkin> {
+    let url = url.trim();
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err(AppError::msg("URL inválida"));
+    }
+    let bytes = launcher
+        .http
+        .get(url)
+        .send()
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?;
+    let fallback_name = if name.trim().is_empty() { "Skin da web" } else { name.trim() };
+    store_skin_bytes(&launcher, fallback_name, &variant, &bytes)
 }
 
 #[tauri::command]

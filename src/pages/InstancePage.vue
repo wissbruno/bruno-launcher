@@ -11,6 +11,8 @@ import {
   openInstanceFolder,
   listInstanceContent,
   removeInstanceContent,
+  setInstanceIcon,
+  setInstancePinned,
   formatPlaytime,
   type ContentFile,
 } from '../api/backend';
@@ -104,6 +106,32 @@ async function removeFile(file: ContentFile) {
   refreshContent();
 }
 
+async function onIconFile(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  try {
+    const buf = await file.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    await setInstanceIcon(id.value, base64);
+    await store.refreshInstances();
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    (event.target as HTMLInputElement).value = '';
+  }
+}
+
+async function clearIcon() {
+  await setInstanceIcon(id.value, '');
+  await store.refreshInstances();
+}
+
+async function togglePin() {
+  if (!instance.value) return;
+  await setInstancePinned(id.value, !instance.value.pinned);
+  await store.refreshInstances();
+}
+
 function formatSize(bytes: number): string {
   if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -115,7 +143,11 @@ function formatSize(bytes: number): string {
     <button class="back" @click="router.push('/library')">← Biblioteca</button>
 
     <header class="card header">
-      <InstanceIcon :instance="instance" :size="88" />
+      <label class="icon-edit" title="Trocar ícone da instância">
+        <InstanceIcon :instance="instance" :size="88" />
+        <span class="icon-overlay">✎</span>
+        <input type="file" accept="image/png,image/jpeg" hidden @change="onIconFile" />
+      </label>
       <div class="head-info">
         <div v-if="renaming" class="rename-row">
           <input v-model="newName" @keyup.enter="saveRename" />
@@ -133,7 +165,16 @@ function formatSize(bytes: number): string {
       <div class="head-actions">
         <button v-if="isRunning" class="stop" @click="stop">■ Parar</button>
         <button v-else class="btn-brand" @click="play">▶ Jogar</button>
+        <button
+          class="pin"
+          :class="{ active: instance.pinned }"
+          :title="instance.pinned ? 'Desafixar' : 'Fixar no topo'"
+          @click="togglePin"
+        >
+          {{ instance.pinned ? '★' : '☆' }}
+        </button>
         <button title="Abrir pasta" @click="openInstanceFolder(id)">📁</button>
+        <button v-if="instance.custom_icon" title="Remover ícone" @click="clearIcon">🖼</button>
         <button
           v-if="!instance.installed"
           title="Baixar arquivos do jogo"
@@ -199,6 +240,34 @@ function formatSize(bytes: number): string {
   display: flex;
   gap: 1rem;
   align-items: center;
+}
+
+.icon-edit {
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: block;
+}
+
+.icon-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border-radius: var(--radius-md);
+  opacity: 0;
+  transition: opacity 0.15s;
+  font-size: 24px;
+}
+
+.icon-edit:hover .icon-overlay {
+  opacity: 1;
+}
+
+.pin.active {
+  color: var(--color-orange);
 }
 
 .head-info {

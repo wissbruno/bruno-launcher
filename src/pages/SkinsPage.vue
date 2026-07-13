@@ -4,6 +4,8 @@ import { useLauncherStore } from '../stores/launcher';
 import {
   listSavedSkins,
   addSavedSkin,
+  importSkinFromPlayer,
+  importSkinFromUrl,
   deleteSavedSkin,
   setFavoriteSkin,
   applySavedSkin,
@@ -17,6 +19,44 @@ const variant = ref<'classic' | 'slim'>('classic');
 const busy = ref(false);
 const msg = ref('');
 const error = ref('');
+
+// Importação online
+const playerNick = ref('');
+const skinUrl = ref('');
+
+async function importByNick() {
+  if (!playerNick.value.trim()) return;
+  busy.value = true;
+  error.value = '';
+  msg.value = '';
+  try {
+    const skin = await importSkinFromPlayer(playerNick.value.trim());
+    await refresh();
+    msg.value = `Skin de ${skin.name} importada!`;
+    playerNick.value = '';
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function importByUrl() {
+  if (!skinUrl.value.trim()) return;
+  busy.value = true;
+  error.value = '';
+  msg.value = '';
+  try {
+    await importSkinFromUrl('', variant.value, skinUrl.value.trim());
+    await refresh();
+    msg.value = 'Skin importada da web!';
+    skinUrl.value = '';
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    busy.value = false;
+  }
+}
 
 async function refresh() {
   try {
@@ -92,6 +132,35 @@ async function apply(skin: SavedSkin) {
       Modelo ao adicionar:
       <button :class="{ sel: variant === 'classic' }" @click="variant = 'classic'">Clássico (Steve)</button>
       <button :class="{ sel: variant === 'slim' }" @click="variant = 'slim'">Fino (Alex)</button>
+    </div>
+
+    <div class="import-online card">
+      <div class="import-row">
+        <label>🎮 Importar do jogador</label>
+        <div class="inputs">
+          <input
+            v-model="playerNick"
+            placeholder="Nick de qualquer jogador (ex.: Notch)"
+            :disabled="busy || !store.isTauri"
+            @keyup.enter="importByNick"
+          />
+          <button :disabled="busy || !playerNick.trim()" @click="importByNick">Buscar</button>
+        </div>
+        <span class="tip">Pega a skin real de qualquer conta do Minecraft pela API oficial da Mojang.</span>
+      </div>
+      <div class="import-row">
+        <label>🔗 Importar de uma URL (PNG)</label>
+        <div class="inputs">
+          <input
+            v-model="skinUrl"
+            placeholder="Cole o link do PNG de um site de skins"
+            :disabled="busy || !store.isTauri"
+            @keyup.enter="importByUrl"
+          />
+          <button :disabled="busy || !skinUrl.trim()" @click="importByUrl">Baixar</button>
+        </div>
+        <span class="tip">Ache uma skin no minecraftskins.com/namemc, copie o link da imagem PNG e cole aqui (usa o modelo selecionado acima).</span>
+      </div>
     </div>
 
     <p v-if="!store.activeAccount" class="note card">
@@ -186,6 +255,42 @@ async function apply(skin: SavedSkin) {
 .variant-hint button.sel {
   background: var(--color-brand-highlight);
   color: var(--color-brand);
+}
+
+.import-online {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.import-row {
+  flex: 1;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.import-row label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-contrast);
+}
+
+.import-row .inputs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.import-row .inputs input {
+  flex: 1;
+  min-width: 0;
+}
+
+.import-row .tip {
+  font-size: 11.5px;
+  color: var(--color-secondary);
 }
 
 .note {

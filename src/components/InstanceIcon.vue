@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import type { Instance } from '../api/backend';
+import { computed, ref, watchEffect } from 'vue';
+import { getInstanceIcon, type Instance } from '../api/backend';
 
 const props = defineProps<{ instance: Instance; size?: number }>();
 
@@ -14,12 +14,28 @@ const color = computed(() => {
 
 const px = computed(() => `${props.size ?? 56}px`);
 const initial = computed(() => props.instance.name.charAt(0).toUpperCase());
+
+// Ícone personalizado (salvo em disco) carregado sob demanda como data URL
+const customSrc = ref<string | null>(null);
+watchEffect(async () => {
+  customSrc.value = null;
+  if (props.instance.custom_icon) {
+    try {
+      const b64 = await getInstanceIcon(props.instance.id);
+      customSrc.value = `data:image/png;base64,${b64}`;
+    } catch {
+      customSrc.value = null;
+    }
+  }
+});
+
+const src = computed(() => customSrc.value ?? props.instance.icon_url);
 </script>
 
 <template>
   <img
-    v-if="instance.icon_url"
-    :src="instance.icon_url"
+    v-if="src"
+    :src="src"
     class="icon"
     :style="{ width: px, height: px }"
     alt=""
@@ -34,6 +50,7 @@ const initial = computed(() => props.instance.name.charAt(0).toUpperCase());
   border-radius: var(--radius-md);
   object-fit: cover;
   flex-shrink: 0;
+  image-rendering: auto;
 }
 
 .placeholder {

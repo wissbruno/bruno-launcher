@@ -22,6 +22,9 @@ pub fn run() {
             instances::delete_instance,
             instances::rename_instance,
             instances::duplicate_instance,
+            instances::set_instance_icon,
+            instances::get_instance_icon,
+            instances::set_instance_pinned,
             instances::open_instance_folder,
             instances::list_instance_content,
             instances::remove_instance_content,
@@ -49,6 +52,8 @@ pub fn run() {
             // Galeria de skins
             skins::list_saved_skins,
             skins::add_saved_skin,
+            skins::import_skin_from_player,
+            skins::import_skin_from_url,
             skins::delete_saved_skin,
             skins::set_favorite_skin,
             skins::apply_saved_skin,

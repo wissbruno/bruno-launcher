@@ -10,6 +10,7 @@ use modrinth_replica_lib::content;
 use modrinth_replica_lib::instances;
 use modrinth_replica_lib::minecraft::launch::{self, AuthSession};
 use modrinth_replica_lib::minecraft::loader;
+use modrinth_replica_lib::skins;
 use modrinth_replica_lib::state::Launcher;
 
 const GAME: &str = "1.21.1";
@@ -174,6 +175,30 @@ async fn contabiliza_playtime() {
         "playtime não foi contabilizado: {before} -> {after}"
     );
     println!("[teste] SUCESSO: playtime somou {}s", after - before);
+}
+
+/// Importa a skin de um jogador conhecido (Notch) pela API oficial da Mojang
+/// e confere que virou uma skin na galeria.
+#[tokio::test(flavor = "multi_thread")]
+async fn importa_skin_por_nick() {
+    use tauri::Manager;
+    let mock = tauri::test::mock_app();
+    let app = mock.handle().clone();
+    app.manage(Launcher::new().expect("launcher"));
+    let launcher = app.state::<Launcher>();
+
+    let skin = skins::import_skin_from_player(launcher.clone(), "Notch".to_string())
+        .await
+        .expect("importar skin do Notch");
+    println!("[teste] skin importada: {} ({})", skin.name, skin.variant);
+    assert_eq!(skin.name, "Notch");
+
+    let saved = skins::list_saved_skins(launcher).expect("listar skins");
+    assert!(
+        saved.iter().any(|s| s.skin.id == skin.id && !s.png_base64.is_empty()),
+        "skin não apareceu na galeria com PNG"
+    );
+    println!("[teste] SUCESSO: skin do Notch na galeria");
 }
 
 /// Instala o Mod Menu na instância de teste e confere que as dependências
